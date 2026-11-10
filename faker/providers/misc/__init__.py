@@ -2,38 +2,50 @@ import csv
 import hashlib
 import io
 import json
+import os
 import re
 import string
 import tarfile
 import uuid
 import zipfile
 
-from typing import Any, Callable, Dict, List, Optional, Sequence, Set, Tuple, Union
+from json import JSONEncoder
+from typing import Any, Callable, Dict, List, Literal, Optional, Sequence, Set, Tuple, Type, Union, overload
 
 from faker.exceptions import UnsupportedFeature
 
 from .. import BaseProvider
+from ..python import TypesSpec
 
 localized = True
 
-csv.register_dialect("faker-csv", csv.excel, quoting=csv.QUOTE_ALL)
+csv.register_dialect("faker-csv", csv.excel, quoting=csv.QUOTE_ALL)  # type: ignore
+
+
+ColumnSpec = Union[Tuple[int, str], Tuple[int, str, Dict[str, Any]]]
+DataColumns = List[ColumnSpec]
+
+# Upper bound for the seeded timestamps used by ``uuid1``/``uuid7``: 2035-01-01 UTC.
+# Drawing the timestamp from this fixed range (rather than the wall clock) keeps the
+# generated UUIDs reproducible under a fixed seed while still spanning plausible dates.
+_MAX_UNIX_TIME_S = 2051222400
+_MAX_UNIX_TIME_MS = _MAX_UNIX_TIME_S * 1_000
+_MAX_UNIX_TIME_NS = _MAX_UNIX_TIME_S * 1_000_000_000
 
 
 class Provider(BaseProvider):
     def boolean(self, chance_of_getting_true: int = 50) -> bool:
         """Generate a random boolean value based on ``chance_of_getting_true``.
 
-        :sample size=10: chance_of_getting_true=25
-        :sample size=10: chance_of_getting_true=50
-        :sample size=10: chance_of_getting_true=75
+        :sample: chance_of_getting_true=25
+        :sample: chance_of_getting_true=50
+        :sample: chance_of_getting_true=75
         """
         return self.generator.random.randint(1, 100) <= chance_of_getting_true
 
     def null_boolean(self) -> Optional[bool]:
-        """Generate ``None``, ``True``, or ``False``, each with equal probability.
+        """Generate ``None``, ``True``, or ``False``, each with equal probability."""
 
-        :sample size=15:
-        """
         return {
             0: None,
             1: True,
@@ -43,10 +55,27 @@ class Provider(BaseProvider):
     def binary(self, length: int = (1 * 1024 * 1024)) -> bytes:
         """Generate a random binary blob of ``length`` bytes.
 
+        If this faker instance has been seeded, performance will be significantly reduced, to conform
+        to the seeding.
+
         :sample: length=64
         """
-        blob = [self.generator.random.randrange(256) for _ in range(length)]
-        return bytes(blob)
+        # If the generator has already been seeded, urandom can't be used
+        if self.generator._is_seeded:
+            blob = [self.generator.random.randrange(256) for _ in range(length)]
+            return bytes(blob)
+
+        # Generator is unseeded anyway, just use urandom
+        return os.urandom(length)
+
+    @overload
+    def md5(self) -> str: ...
+
+    @overload
+    def md5(self, raw_output: Literal[True]) -> bytes: ...
+
+    @overload
+    def md5(self, raw_output: Literal[False]) -> str: ...
 
     def md5(self, raw_output: bool = False) -> Union[bytes, str]:
         """Generate a random MD5 hash.
@@ -62,10 +91,19 @@ class Provider(BaseProvider):
             return res.digest()
         return res.hexdigest()
 
-    def sha1(self, raw_output: bool = False) -> Union[bytes, str]:
-        """Generate a random SHA1 hash.
+    @overload
+    def sha1(self) -> str: ...
 
-        If ``raw_output`` is ``False`` (default), a hexadecimal string representation of the SHA1 hash
+    @overload
+    def sha1(self, raw_output: Literal[True]) -> bytes: ...
+
+    @overload
+    def sha1(self, raw_output: Literal[False]) -> str: ...
+
+    def sha1(self, raw_output: bool = False) -> Union[bytes, str]:
+        """Generate a random SHA-1 hash.
+
+        If ``raw_output`` is ``False`` (default), a hexadecimal string representation of the SHA-1 hash
         will be returned. If ``True``, a ``bytes`` object representation will be returned instead.
 
         :sample: raw_output=False
@@ -76,10 +114,19 @@ class Provider(BaseProvider):
             return res.digest()
         return res.hexdigest()
 
-    def sha256(self, raw_output: bool = False) -> Union[bytes, str]:
-        """Generate a random SHA256 hash.
+    @overload
+    def sha256(self) -> str: ...
 
-        If ``raw_output`` is ``False`` (default), a hexadecimal string representation of the SHA56 hash
+    @overload
+    def sha256(self, raw_output: Literal[True]) -> bytes: ...
+
+    @overload
+    def sha256(self, raw_output: Literal[False]) -> str: ...
+
+    def sha256(self, raw_output: bool = False) -> Union[bytes, str]:
+        """Generate a random SHA-256 hash.
+
+        If ``raw_output`` is ``False`` (default), a hexadecimal string representation of the SHA-256 hash
         will be returned. If ``True``, a ``bytes`` object representation will be returned instead.
 
         :sample: raw_output=False
@@ -89,6 +136,18 @@ class Provider(BaseProvider):
         if raw_output:
             return res.digest()
         return res.hexdigest()
+
+    @overload
+    def uuid4(self) -> str: ...
+
+    @overload
+    def uuid4(self, cast_to: None) -> uuid.UUID: ...
+
+    @overload
+    def uuid4(self, cast_to: Callable[[uuid.UUID], str]) -> str: ...
+
+    @overload
+    def uuid4(self, cast_to: Callable[[uuid.UUID], bytes]) -> bytes: ...
 
     def uuid4(
         self,
@@ -105,6 +164,128 @@ class Provider(BaseProvider):
         """
         # Based on http://stackoverflow.com/q/41186818
         generated_uuid: uuid.UUID = uuid.UUID(int=self.generator.random.getrandbits(128), version=4)
+        if cast_to is not None:
+            return cast_to(generated_uuid)
+        return generated_uuid
+
+    @overload
+    def uuid1(self) -> str: ...
+
+    @overload
+    def uuid1(self, cast_to: None) -> uuid.UUID: ...
+
+    @overload
+    def uuid1(self, cast_to: Callable[[uuid.UUID], str]) -> str: ...
+
+    @overload
+    def uuid1(self, cast_to: Callable[[uuid.UUID], bytes]) -> bytes: ...
+
+    def uuid1(
+        self,
+        cast_to: Optional[Union[Callable[[uuid.UUID], str], Callable[[uuid.UUID], bytes]]] = str,
+    ) -> Union[bytes, str, uuid.UUID]:
+        """Generate a random UUID1 (time-based) object and cast it to another type using a callable ``cast_to``.
+
+        Uses the Faker random generator for the clock sequence and node fields to ensure seedability,
+        while the timestamp is drawn from the seeded generator so the result is reproducible.
+
+        By default, ``cast_to`` is set to ``str``.
+
+        May be called with ``cast_to=None`` to return a full-fledged ``UUID``.
+
+        :sample:
+        :sample: cast_to=None
+        """
+        # Generate random node (48 bits) and clock_seq (14 bits) for seedability
+        node: int = self.generator.random.getrandbits(48)
+        clock_seq: int = self.generator.random.getrandbits(14)
+        # Draw the timestamp from the seeded generator so the result is reproducible under a
+        # fixed seed. UUID1 timestamps are 100-nanosecond intervals since 1582-10-15.
+        nanoseconds = self.generator.random.randint(0, _MAX_UNIX_TIME_NS)
+        # Convert to UUID1 timestamp (100-ns intervals since 1582-10-15)
+        timestamp = nanoseconds // 100 + 0x01B21DD213814000
+
+        time_low = timestamp & 0xFFFFFFFF
+        time_mid = (timestamp >> 32) & 0xFFFF
+        time_hi_version = (timestamp >> 48) & 0x0FFF
+        time_hi_version |= 1 << 12  # version 1
+
+        clock_seq_low = clock_seq & 0xFF
+        clock_seq_hi_variant = (clock_seq >> 8) & 0x3F
+        clock_seq_hi_variant |= 0x80  # variant RFC 4122
+
+        generated_uuid = uuid.UUID(
+            fields=(time_low, time_mid, time_hi_version, clock_seq_hi_variant, clock_seq_low, node),
+        )
+        if cast_to is not None:
+            return cast_to(generated_uuid)
+        return generated_uuid
+
+    @overload
+    def uuid7(self) -> str: ...
+
+    @overload
+    def uuid7(self, cast_to: None) -> uuid.UUID: ...
+
+    @overload
+    def uuid7(self, cast_to: Callable[[uuid.UUID], str]) -> str: ...
+
+    @overload
+    def uuid7(self, cast_to: Callable[[uuid.UUID], bytes]) -> bytes: ...
+
+    def uuid7(
+        self,
+        cast_to: Optional[Union[Callable[[uuid.UUID], str], Callable[[uuid.UUID], bytes]]] = str,
+    ) -> Union[bytes, str, uuid.UUID]:
+        """Generate a random UUID7 (Unix Epoch time-based) object and cast it to another type using ``cast_to``.
+
+        UUID7 is defined in RFC 9562 and provides time-ordered UUIDs using a Unix epoch timestamp
+        with millisecond precision, combined with random bits for uniqueness.
+
+        The implementation uses the Faker random generator for all random components to ensure
+        seedability. The timestamp is also drawn from the seeded generator so results are reproducible.
+
+        By default, ``cast_to`` is set to ``str``.
+
+        May be called with ``cast_to=None`` to return a full-fledged ``UUID``.
+
+        :sample:
+        :sample: cast_to=None
+        """
+        # RFC 9562 UUID version 7 layout:
+        #  0                   1                   2                   3
+        #  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+        # +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+        # |                         unix_ts_ms (48 bits)                  |
+        # +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+        # |  ver  |         rand_a (12 bits)        |var|   rand_b        |
+        # +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+        # |                         rand_b (64 bits total)                |
+        # +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+        # 48-bit Unix timestamp in milliseconds, drawn from the seeded generator so the result
+        # is reproducible under a fixed seed.
+        unix_ts_ms = self.generator.random.randint(0, _MAX_UNIX_TIME_MS)
+
+        # 12 bits of random data (rand_a)
+        rand_a = self.generator.random.getrandbits(12)
+
+        # 62 bits of random data (rand_b)
+        rand_b = self.generator.random.getrandbits(62)
+
+        # Assemble the 128-bit UUID
+        # Bits 0-47: unix_ts_ms
+        # Bits 48-51: version (0b0111 = 7)
+        # Bits 52-63: rand_a
+        # Bits 64-65: variant (0b10)
+        # Bits 66-127: rand_b
+        uuid_int = (unix_ts_ms & 0xFFFFFFFFFFFF) << 80
+        uuid_int |= 0x7 << 76  # version 7
+        uuid_int |= (rand_a & 0xFFF) << 64
+        uuid_int |= 0x2 << 62  # variant RFC 4122
+        uuid_int |= rand_b & 0x3FFFFFFFFFFFFFFF
+
+        generated_uuid = uuid.UUID(int=uuid_int)
         if cast_to is not None:
             return cast_to(generated_uuid)
         return generated_uuid
@@ -266,14 +447,13 @@ class Provider(BaseProvider):
             raise AssertionError(
                 "`uncompressed_size` is smaller than the calculated minimum required size",
             )
+        mode: Literal["w|", "w|gz", "w|bz2", "w|xz"] = "w|"
         if compression in ["gzip", "gz"]:
-            mode = "w:gz"
+            mode = "w|gz"
         elif compression in ["bzip2", "bz2"]:
-            mode = "w:bz2"
+            mode = "w|bz2"
         elif compression in ["lzma", "xz"]:
-            mode = "w:xz"
-        else:
-            mode = "w"
+            mode = "w|xz"
 
         tar_buffer = io.BytesIO()
         remaining_size = uncompressed_size
@@ -319,8 +499,8 @@ class Provider(BaseProvider):
         The arguments ``hue`` and ``luminosity`` are the same as in the color provider and are simply forwarded to
         it to generate both the background and the shape colors. Therefore, you can ask for a "dark blue" image, etc.
 
-        :sample size=2: size=(2, 2), hue='purple', luminosity='bright', image_format='pdf'
-        :sample size=2: size=(16, 16), hue=[90,270], image_format='ico'
+        :sample: size=(2, 2), hue='purple', luminosity='bright', image_format='pdf'
+        :sample: size=(16, 16), hue=[90,270], image_format='ico'
         """
         try:
             import PIL.Image
@@ -328,7 +508,7 @@ class Provider(BaseProvider):
         except ImportError:
             raise UnsupportedFeature("`image` requires the `Pillow` python library.", "image")
 
-        (width, height) = size
+        width, height = size
         image = PIL.Image.new("RGB", size, self.generator.color(hue=hue, luminosity=luminosity))
         draw = PIL.ImageDraw.Draw(image)
         draw.polygon(
@@ -481,7 +661,28 @@ class Provider(BaseProvider):
             delimiter="|",
         )
 
-    def json(self, data_columns: List = None, num_rows: int = 10, indent: int = None) -> str:
+    def json_bytes(
+        self,
+        data_columns: Optional[List] = None,
+        num_rows: int = 10,
+        indent: Optional[int] = None,
+        cls: Optional[Type[JSONEncoder]] = None,
+    ) -> bytes:
+        """
+        Generate random JSON structure and return as bytes.
+
+        For more information on the different arguments of this method, refer to
+        :meth:`json() <faker.providers.misc.Provider.json>` which is used under the hood.
+        """
+        return self.json(data_columns=data_columns, num_rows=num_rows, indent=indent, cls=cls).encode()
+
+    def json(
+        self,
+        data_columns: Optional[List] = None,
+        num_rows: int = 10,
+        indent: Optional[int] = None,
+        cls: Optional[Type[JSONEncoder]] = None,
+    ) -> str:
         """
         Generate random JSON structure values.
 
@@ -514,6 +715,8 @@ class Provider(BaseProvider):
         :type num_rows: int
         :param indent: number of spaces to indent the fields
         :type indent: int
+        :param cls: optional json encoder to use for non-standard objects such as datetimes
+        :type cls: json.JSONEncoder
         :return: Serialized JSON data
         :rtype: str
 
@@ -578,12 +781,41 @@ class Provider(BaseProvider):
             raise TypeError("Invalid data_columns type. Must be a dictionary or list")
 
         if num_rows == 1:
-            return json.dumps(create_json_structure(data_columns), indent=indent)
+            return json.dumps(create_json_structure(data_columns), indent=indent, cls=cls)
 
         data = [create_json_structure(data_columns) for _ in range(num_rows)]
-        return json.dumps(data, indent=indent)
+        return json.dumps(data, indent=indent, cls=cls)
 
-    def fixed_width(self, data_columns: list = None, num_rows: int = 10, align: str = "left") -> str:
+    def xml(
+        self,
+        nb_elements: int = 10,
+        variable_nb_elements: bool = True,
+        value_types: Optional[TypesSpec] = None,
+        allowed_types: Optional[TypesSpec] = None,
+    ) -> str:
+        """
+        Returns some XML.
+
+        :nb_elements: number of elements for dictionary
+        :variable_nb_elements: is use variable number of elements for dictionary
+        :value_types: type of dictionary values
+
+        Note: this provider required xmltodict library installed
+        """
+        try:
+            import xmltodict
+        except ImportError:
+            raise UnsupportedFeature("`xml` requires the `xmltodict` Python library.", "xml")
+        _dict = self.generator.pydict(
+            nb_elements=nb_elements,
+            variable_nb_elements=variable_nb_elements,
+            value_types=value_types,
+            allowed_types=allowed_types,
+        )
+        _dict = {self.generator.word(): _dict}
+        return xmltodict.unparse(_dict)
+
+    def fixed_width(self, data_columns: Optional[DataColumns] = None, num_rows: int = 10, align: str = "left") -> str:
         """
         Generate random fixed width values.
 
@@ -623,7 +855,8 @@ class Provider(BaseProvider):
             (20, "name"),
             (3, "pyint", {"max_value": 20}),
         ]
-        data_columns = data_columns if data_columns else default_data_columns
+        if data_columns is None:
+            data_columns: DataColumns = default_data_columns  # type: ignore
         align_map = {
             "left": "<",
             "middle": "^",
@@ -634,7 +867,7 @@ class Provider(BaseProvider):
         for _ in range(num_rows):
             row = []
 
-            for width, definition, *arguments in data_columns:
+            for width, definition, *arguments in data_columns:  # type: ignore
                 kwargs = arguments[0] if arguments else {}
 
                 if not isinstance(kwargs, dict):
@@ -648,7 +881,7 @@ class Provider(BaseProvider):
 
     def _value_format_selection(self, definition: str, **kwargs: Any) -> Union[int, str]:
         """
-        Formats the string in different ways depending on it's contents.
+        Formats the string in different ways depending on its contents.
 
         The return can be the '@word' itself, a '{{ token }}' passed to PyStr,
         or a 'provider:argument_group' format field that returns potentially
@@ -666,12 +899,12 @@ class Provider(BaseProvider):
         if re.match(r"^@.*", definition):
             return definition.lstrip("@")
 
-        # Check if a argument group has been supplied
+        # Check if an argument group has been supplied
         if re.match(r"^[a-zA-Z0-9_-]*:\w", definition):
             definition, argument_group = definition.split(":")
             arguments = self.generator.get_arguments(argument_group.strip())
 
             return self.generator.format(definition.strip(), **arguments)
 
-        # Assume the string is refering to a provider
+        # Assume the string is referring to a provider
         return self.generator.format(definition, **kwargs)

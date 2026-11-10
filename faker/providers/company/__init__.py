@@ -6,15 +6,15 @@ localized = True
 
 
 class Provider(BaseProvider):
-    formats: ElementsType = (
+    formats: ElementsType[str] = (
         "{{last_name}} {{company_suffix}}",
         "{{last_name}}-{{last_name}}",
         "{{last_name}}, {{last_name}} and {{last_name}}",
     )
 
-    company_suffixes: ElementsType = ("Inc", "and Sons", "LLC", "Group", "PLC", "Ltd")
+    company_suffixes: ElementsType[str] = ("Inc", "and Sons", "LLC", "Group", "PLC", "Ltd")
 
-    catch_phrase_words: Tuple[ElementsType, ...] = (
+    catch_phrase_words: Tuple[ElementsType[str], ...] = (
         (
             "Adaptive",
             "Advanced",
@@ -328,7 +328,7 @@ class Provider(BaseProvider):
         ),
     )
 
-    bsWords: Tuple[ElementsType, ...] = (
+    bsWords: Tuple[ElementsType[str], ...] = (
         (
             "implement",
             "utilize",
@@ -507,25 +507,25 @@ class Provider(BaseProvider):
 
     def company(self) -> str:
         """
-        :example 'Acme Ltd'
+        :example: 'Acme Ltd'
         """
         pattern: str = self.random_element(self.formats)
         return self.generator.parse(pattern)
 
     def company_suffix(self) -> str:
         """
-        :example 'Ltd'
+        :example: 'Ltd'
         """
         return self.random_element(self.company_suffixes)
 
     def catch_phrase(self) -> str:
         """
-        :example 'Robust full-range hub'
+        :example: 'Robust full-range hub'
         """
         return " ".join([self.random_element(word_list) for word_list in self.catch_phrase_words])
 
     def bs(self) -> str:
         """
-        :example 'integrate extensible convergence'
+        :example: 'integrate extensible convergence'
         """
         return " ".join([self.random_element(word_list) for word_list in self.bsWords])

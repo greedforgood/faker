@@ -1,28 +1,38 @@
+import random
 import re
 import unittest
 
 from datetime import datetime
 from itertools import cycle
-from typing import Pattern
+from typing import Pattern, Tuple
 from unittest import mock
 
 import freezegun
 import pytest
-import random2
 
+from stdnum.bg import vat as bg_vat
+from stdnum.gb import vat as gb_vat
 from validators.i18n.es import es_cif as is_cif
 from validators.i18n.es import es_nie as is_nie
 from validators.i18n.es import es_nif as is_nif
 
-from faker import Faker
+from faker import Factory, Faker
+from faker.providers.ssn.el_GR import tin_checksum as gr_tin_checksum
 from faker.providers.ssn.en_CA import checksum as ca_checksum
+from faker.providers.ssn.en_GB import Provider as en_GB_Provider
+from faker.providers.ssn.en_IN import calculate_gstin_checksum
+from faker.providers.ssn.es_CL import rut_check_digit as cl_rut_checksum
 from faker.providers.ssn.es_CO import nit_check_digit
 from faker.providers.ssn.es_MX import curp_checksum as mx_curp_checksum
 from faker.providers.ssn.es_MX import ssn_checksum as mx_ssn_checksum
 from faker.providers.ssn.et_EE import checksum as et_checksum
 from faker.providers.ssn.fi_FI import Provider as fi_Provider
+from faker.providers.ssn.fr_FR import Provider as fr_Provider
 from faker.providers.ssn.fr_FR import calculate_checksum as fr_calculate_checksum
 from faker.providers.ssn.hr_HR import checksum as hr_checksum
+from faker.providers.ssn.it_IT import checksum as it_checksum
+from faker.providers.ssn.lv_LV import Provider as lv_Provider
+from faker.providers.ssn.mk_MK import Provider as MkMKSsnProvider
 from faker.providers.ssn.no_NO import Provider as no_Provider
 from faker.providers.ssn.no_NO import checksum as no_checksum
 from faker.providers.ssn.pl_PL import calculate_month as pl_calculate_mouth
@@ -30,116 +40,48 @@ from faker.providers.ssn.pl_PL import checksum as pl_checksum
 from faker.providers.ssn.pt_BR import checksum as pt_checksum
 from faker.providers.ssn.ro_RO import ssn_checksum as ro_ssn_checksum
 from faker.providers.ssn.ro_RO import vat_checksum as ro_vat_checksum
+from faker.providers.ssn.sr_BA import calculate_checksum as sr_ba_calculate_checksum
+from faker.providers.ssn.uk_UA import Provider as uk_Provider
+from faker.providers.ssn.zh_TW import checksum as tw_checksum
 from faker.utils.checksums import luhn_checksum
 
 
-class TestSvSE(unittest.TestCase):
+class TestArDz(unittest.TestCase):
     def setUp(self):
-        self.fake = Faker("sv_SE")
+        self.fake = Faker("ar_DZ")
         Faker.seed(0)
 
-    def partial_sum(self, number, mult_factor):
-        quotient, remainder = divmod(number * mult_factor, 10)
-        return quotient + remainder
-
-    def ssn_checksum(self, ssn):
-        """Validates the checksum digit and returns a Boolean"""
-        ssn = ssn.replace("-", "")
-        if len(ssn) == 12:
-            ssn = ssn[2:]
-        if len(ssn) != 10:
-            return False
-
-        mult_factors = cycle([2, 1])
-        final_sum = sum(self.partial_sum(int(char), mf) for char, mf in zip(ssn[:9], mult_factors))
-        chksum = -final_sum % 10
-        return chksum == int(ssn[-1])
-
-    def validate_date_string(self, date_str):
-        date_len = len(date_str)
-        if date_len == 6:
-            year_fmt = "%y"
-        elif date_len == 8:
-            year_fmt = "%Y"
-        else:
-            return False
-
-        try:
-            if date_str != datetime.strptime(date_str, f"{year_fmt}%m%d").strftime(f"{year_fmt}%m%d"):
-                raise ValueError
-            return True
-        except ValueError:
-            return False
-
-    def test_pers_id_short_with_dash(self):
-        """Regression case that ensures previous implementations work as-is"""
+    def test_ssn(self):
+        pattern = re.compile(r"[12][01]\d{3}(0[1-9]|[1-4]\d|5[0-8])\d{2}\d{5}\d{2}\d{2}")
         for _ in range(100):
-            pers_id = self.fake.ssn()
-            assert re.search(r"\d{6}-\d{4}", pers_id)
-            assert self.validate_date_string(pers_id[:6]) is True
-            assert self.ssn_checksum(pers_id) is True
+            ssn = self.fake.ssn()
+            assert len(ssn) == 18
+            assert pattern.fullmatch(ssn) is not None
 
-    def test_pers_id_short_no_dash(self):
+    def test_ssn_control_key(self):
         for _ in range(100):
-            pers_id = self.fake.ssn(dash=False)
-            assert re.search(r"\d{10}", pers_id)
-            assert self.validate_date_string(pers_id[:6]) is True
-            assert self.ssn_checksum(pers_id) is True
+            ssn = self.fake.ssn()
+            base = ssn[:16]
+            total, alternate = 0, False
+            for i in range(len(base) - 1, -1, -1):
+                d = int(base[i]) * (2 if alternate else 1)
+                total += d - 9 if d > 9 else d
+                alternate = not alternate
+            remainder = total % 10
+            assert f"{(0 if remainder == 0 else 10 - remainder):02d}" == ssn[16:]
 
-    def test_pers_id_long_with_dash(self):
-        for _ in range(100):
-            pers_id = self.fake.ssn(long=True)
-            assert re.search(r"\d{8}-\d{4}", pers_id)
-            assert self.validate_date_string(pers_id[:8]) is True
-            assert self.ssn_checksum(pers_id) is True
 
-    def test_pers_id_long_no_dash(self):
-        for _ in range(100):
-            pers_id = self.fake.ssn(long=True, dash=False)
-            assert re.search(r"\d{12}", pers_id)
-            assert self.validate_date_string(pers_id[:8]) is True
-            assert self.ssn_checksum(pers_id) is True
+class TestAzAz(unittest.TestCase):
+    num_sample_runs = 10
 
-    def test_org_id_short_with_dash(self):
-        for _ in range(100):
-            org_id = self.fake.org_id()
-            assert re.search(r"\d{6}-\d{4}", org_id)
-            assert int(org_id[2:4]) >= 20
-            assert self.ssn_checksum(org_id) is True
+    def setUp(self):
+        self.fake = Faker("az_AZ")
+        self.samples = [self.fake.ssn() for _ in range(self.num_sample_runs)]
+        Faker.seed(0)
 
-    def test_org_id_short_no_dash(self):
-        for _ in range(100):
-            org_id = self.fake.org_id(dash=False)
-            assert re.search(r"\d{10}", org_id)
-            assert int(org_id[2:4]) >= 20
-            assert self.ssn_checksum(org_id) is True
-
-    def test_org_id_long_with_dash(self):
-        for _ in range(100):
-            org_id = self.fake.org_id(long=True)
-            assert re.search(r"\d{8}-\d{4}", org_id)
-            assert int(org_id[4:6]) >= 20
-            assert self.ssn_checksum(org_id) is True
-
-    def test_org_id_long_no_dash(self):
-        for _ in range(100):
-            org_id = self.fake.org_id(long=True, dash=False)
-            assert re.search(r"\d{12}", org_id)
-            assert int(org_id[4:6]) >= 20
-            assert self.ssn_checksum(org_id) is True
-
-    def test_vat_id(self):
-        for _ in range(100):
-            vat_id = self.fake.vat_id()
-            assert re.search(r"SE\d{12}", vat_id)
-            assert int(vat_id[2]) in (1, 2, 3, 5, 6, 7, 8, 9)
-            assert int(vat_id[6:8]) >= 20
-
-    def test_org_and_vat_id(self):
-        for _ in range(100):
-            oid, vid = self.fake.org_and_vat_id()
-            assert oid.replace("-", "")[-10:] == vid[4:-2]
-            assert re.search(r"SE\d{12}", vid)
+    def check_length(self):
+        for sample in self.samples:
+            assert len(sample) == 7
 
 
 class TestBgBG(unittest.TestCase):
@@ -150,6 +92,12 @@ class TestBgBG(unittest.TestCase):
     def test_vat_id(self):
         for _ in range(100):
             assert re.search(r"^BG\d{9,10}$", self.fake.vat_id())
+
+    def test_vat_id_checksum(self):
+        for _ in range(200):
+            vat_id = self.fake.vat_id()
+            assert re.search(r"^BG\d{9,10}$", vat_id)
+            assert bg_vat.validate(vat_id) == vat_id[2:]
 
 
 class TestCsCZ(unittest.TestCase):
@@ -169,23 +117,6 @@ class TestCsCZ(unittest.TestCase):
             assert int(birth_number.replace("/", "")) % 11 == 0
 
 
-class TestSkSK(unittest.TestCase):
-    def setUp(self):
-        self.fake = Faker("sk_SK")
-        Faker.seed(0)
-
-    def test_vat_id(self):
-        for _ in range(100):
-            assert re.search(r"^SK\d{10}$", self.fake.vat_id())
-
-    def test_birth_number(self):
-        for _ in range(100):
-            birth_number = self.fake.birth_number()
-            assert len(birth_number) in [10, 11]
-            assert birth_number[6] == "/"
-            assert int(birth_number.replace("/", "")) % 11 == 0
-
-
 class TestDeAT(unittest.TestCase):
     def setUp(self):
         self.fake = Faker("de_AT")
@@ -194,6 +125,58 @@ class TestDeAT(unittest.TestCase):
     def test_vat_id(self):
         for _ in range(100):
             assert re.search(r"^ATU\d{8}$", self.fake.vat_id())
+
+    def test_ssn(self):
+        for _ in range(100):
+            ssn: str = self.fake.ssn()
+            assert len(ssn) == 10
+            assert len(self.fake.ssn(self.fake.date_of_birth())) == 10
+
+    def test_ssn_checkdigit(self):
+        for _ in range(100):
+            ssn: str = self.fake.ssn()
+            ssn_digits: list[int] = [int(char) for char in ssn[:3] + ssn[4:]]
+            factors: list[int] = [3, 7, 9, 5, 8, 4, 2, 1, 6]
+            sum: int = 0
+            for index, digit in enumerate(ssn_digits):
+                sum += digit * factors[index]
+            assert sum % 11 == int(ssn[3])
+
+
+class TestDeDe(unittest.TestCase):
+    def setUp(self):
+        self.fake = Faker("de_DE")
+        self.rvnr_pattern: Pattern = re.compile(r"\d{8}[A-Z]\d{3}")
+        self.kvnr_pattern: Pattern = re.compile(r"[A-Z]\d{19}")
+        Faker.seed(0)
+
+    def test_vat_id(self):
+        for _ in range(100):
+            vat_id = self.fake.vat_id()
+            assert re.fullmatch(r"DE[1-9]\d{8}", vat_id)
+            # the last digit is an ISO 7064 Mod 11,10 check digit over the first 8
+            product = 10
+            for digit in vat_id[2:10]:
+                digit_sum = (int(digit) + product) % 10 or 10
+                product = (2 * digit_sum) % 11
+            assert vat_id[10] == str((11 - product) % 10)
+
+    def test_rvnr(self):
+        for _ in range(100):
+            rvnr = self.fake.rvnr()
+            assert self.rvnr_pattern.fullmatch(rvnr)
+
+    def test_rvnr_birthdate(self):
+        for _ in range(100):
+            birthdate: datetime.date = self.fake.date_object()
+            rvnr = self.fake.rvnr(birthdate)
+            assert self.rvnr_pattern.fullmatch(rvnr)
+            assert rvnr[2:8] == birthdate.strftime("%d%m%y")
+
+    def test_kvnr(self):
+        for _ in range(100):
+            kvnr = self.fake.kvnr()
+            assert self.kvnr_pattern.fullmatch(kvnr)
 
 
 class TestElCY(unittest.TestCase):
@@ -213,11 +196,29 @@ class TestElGr(unittest.TestCase):
 
     def test_vat_id(self):
         for _ in range(100):
-            assert re.search(r"^EL\d{9}$", self.fake.vat_id())
+            prefix = random.choice([True, False])
+            vat_id = self.fake.vat_id(prefix=prefix)
+            assert re.search(r"^(EL)?\d{9}$", vat_id)
+            assert vat_id[2 if prefix else 0] in ("7", "8", "9", "0")
+            assert str(gr_tin_checksum(vat_id[2:-1] if prefix else vat_id[:-1])) == vat_id[-1]
+
+    def test_tin(self):
+        for _ in range(100):
+            tin = self.fake.tin()
+            assert re.search(r"^\d{9}$", tin)
+            assert tin[0] in ("1", "2", "3", "4")
+            assert str(gr_tin_checksum(tin[:-1])) == tin[-1]
+
+    def test_ssn(self):
+        for _ in range(100):
+            ssn = self.fake.ssn()
+            assert re.search(r"^\d{11}$", ssn)
+            assert datetime.strptime(ssn[:6], "%d%m%y")
+            assert luhn_checksum(ssn) == 0
 
     def test_police_id(self):
         for _ in range(100):
-            assert re.search(r"^[ΑΒΓΔΕΖΗΘΙΚΛΜΝΞΟΠΡΣΤΥΦΧΨΩ]{1,2} ?\d{6}$", self.fake.police_id())
+            assert re.search(r"^[ΑΒΕΖΗΙΚΜΝΟΡΤΥΧ]{1,2}\d{6}$", self.fake.police_id())
 
 
 class TestEnCA(unittest.TestCase):
@@ -235,6 +236,167 @@ class TestEnCA(unittest.TestCase):
             assert len(sin) == 11
             assert sin.replace(" ", "").isdigit()
             assert ca_checksum(sin) == int(sin[-1])
+
+    def test_ssn_covers_every_digit_and_stays_valid(self):
+        # Regression (#2487): the non-leading positions excluded the digit 9
+        # and were forced distinct (drawn without replacement from range(9)),
+        # so a 9 could never appear and digits never repeated. A real SIN may
+        # carry a 9 and repeat digits; every generated SIN must stay
+        # checksum-valid. (The leading digit stays in the 1-7 series per
+        # #2467 -- test_ssn_leading_digit_is_a_personal_series covers that.)
+        Faker.seed(0)
+        seen = set()
+        for _ in range(500):
+            sin = self.fake.ssn()
+            assert ca_checksum(sin) == int(sin[-1])
+            seen.update(int(c) for c in sin.replace(" ", "")[:8])
+        # The 9 and every other digit are now reachable in the non-leading
+        # positions; the old code could only ever yield {0..8} distinct.
+        assert 9 in seen
+        assert seen == set(range(10))
+
+    def test_ssn_leading_digit_is_a_personal_series(self):
+        # The leading digit says which series the SIN was issued in. 1-7 are the
+        # provincial series; 8 is reserved for business numbers and 0 for CRA
+        # individual tax numbers, so neither may lead a personal SIN. The
+        # checksum assertions above cannot see this, because the check digit is
+        # derived from whatever digits were drawn.
+        for _ in range(1000):
+            assert self.fake.ssn()[0] in "1234567"
+
+
+class TestEnGB(unittest.TestCase):
+    def setUp(self):
+        self.fake = Faker("en_GB")
+        Faker.seed(0)
+
+    def test_vat_id(self):
+        for _ in range(100):
+            assert re.search(
+                r"^GB\d{3} \d{4} \d{2}(?: \d{3})?$|^GB(?:GD|HA)\d{3}$",
+                self.fake.vat_id(),
+            )
+
+    def test_vat_id_is_valid(self):
+        for _ in range(100):
+            num = self.fake.vat_id()
+            assert gb_vat.is_valid(num), f"Invalid VAT ID: {num}"
+
+    def test_vat_id_each_format(self):
+        cases = (
+            ("GB### #### ##", r"GB\d{3} \d{4} \d{2}"),
+            ("GB### #### ## ###", r"GB\d{3} \d{4} \d{2} \d{3}"),
+            ("GBGD###", r"GBGD\d{3}"),
+            ("GBHA###", r"GBHA\d{3}"),
+        )
+        for pattern, regex in cases:
+            with self.subTest(pattern=pattern):
+                with mock.patch.object(en_GB_Provider, "vat_id_formats", (pattern,)):
+                    for _ in range(100):
+                        number = self.fake.vat_id()
+                        assert re.fullmatch(regex, number)
+                        assert gb_vat.is_valid(number), number
+
+    def test_vat_id_check_digits(self):
+        cases = (
+            ("9807806", "GB980 7806 84"),
+            ("0000001", "GB000 0001 95"),
+            ("0009908", "GB000 9908 00"),
+        )
+        for body, expected in cases:
+            with self.subTest(body=body):
+                with mock.patch.object(en_GB_Provider, "vat_id_formats", ("GB### #### ##",)):
+                    with mock.patch.object(en_GB_Provider, "numerify", return_value=body):
+                        number = self.fake.vat_id()
+                assert number == expected
+                assert gb_vat.is_valid(number)
+
+
+class TestEnIn(unittest.TestCase):
+    def setUp(self):
+        self.fake = Faker("en_IN")
+        Faker.seed(0)
+        self.pan_pattern: Pattern = re.compile(r"^[A-Z]{5}[0-9]{4}[A-Z]$")
+        self.gstin_pattern: Pattern = re.compile(r"^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][0-9A-Z]Z[0-9A-Z]$")
+        test_samples = 10
+        self.aadhaar_ids = [self.fake.aadhaar_id() for _ in range(test_samples)]
+
+    def test_length(self):
+        for aadhaar_id in self.aadhaar_ids:
+            assert len(aadhaar_id) == 12
+
+    def test_first_digit_non_zero(self):
+        for aadhar_id in self.aadhaar_ids:
+            assert aadhar_id[0] != "0"
+
+    def test_valid_luhn(self):
+        for aadhaar_id in self.aadhaar_ids:
+            assert luhn_checksum(aadhaar_id) == 0
+
+    def test_pan(self):
+        for _ in range(100):
+            pan = self.fake.pan()
+            assert self.pan_pattern.search(pan)
+
+    def test_gstin(self):
+        for _ in range(100):
+            gstin = self.fake.gstin()
+            assert self.gstin_pattern.search(gstin)
+
+    def test_gstin_checksum(self):
+        for _ in range(100):
+            gstin = self.fake.gstin()
+            assert calculate_gstin_checksum(gstin[:-1]) == gstin[-1]
+
+    def test_seeded_pan_and_gstin_are_reproducible(self):
+        Faker.seed(42)
+        fake_one = Faker("en_IN")
+        pan_one = fake_one.pan()
+        gstin_one = fake_one.gstin()
+
+        Faker.seed(42)
+        fake_two = Faker("en_IN")
+        pan_two = fake_two.pan()
+        gstin_two = fake_two.gstin()
+
+        assert pan_one == pan_two
+        assert gstin_one == gstin_two
+
+
+class TestEnPh(unittest.TestCase):
+    num_sample_runs = 1000
+
+    def setUp(self):
+        self.sss_pattern: Pattern = re.compile(r"^\d{2}-\d{7}-\d$")
+        self.gsis_pattern: Pattern = re.compile(r"^\d{11}$")
+        self.philhealth_pattern: Pattern = re.compile(r"^\d{2}-\d{9}-\d$")
+        self.pagibig_pattern: Pattern = re.compile(r"^\d{4}-\d{4}-\d{4}$")
+        self.umid_pattern: Pattern = re.compile(r"^\d{4}-\d{7}-\d$")
+        self.setup_faker()
+
+    def setup_faker(self):
+        self.fake = Faker("en_PH")
+        Faker.seed(0)
+
+    def test_PH_sss(self):
+        for i in range(self.num_sample_runs):
+            assert self.sss_pattern.match(self.fake.sss())
+
+    def test_PH_gsis(self):
+        for i in range(self.num_sample_runs):
+            assert self.gsis_pattern.match(self.fake.gsis())
+
+    def test_PH_philhealth(self):
+        for i in range(self.num_sample_runs):
+            assert self.philhealth_pattern.match(self.fake.philhealth())
+
+    def test_PH_pagibig(self):
+        for i in range(self.num_sample_runs):
+            assert self.pagibig_pattern.match(self.fake.pagibig())
+
+    def test_PH_umid(self):
+        for i in range(self.num_sample_runs):
+            assert self.umid_pattern.match(self.fake.umid())
 
 
 class TestEnUS(unittest.TestCase):
@@ -278,7 +440,6 @@ class TestEnUS(unittest.TestCase):
             assert area != "666"
 
     def test_invalid_ssn(self):
-        self.fake.random = random2.Random()
         # Magic Numbers below generate '666-92-7944', '000-54-2963', '956-GG-9478', '436-00-1386',
         # and 134-76-0000 respectively. The "group" (GG) returned for '956-GG-9478 will be a random
         # number, and that random number is not in the "itin_group_numbers" List. The random GG occurs
@@ -340,7 +501,7 @@ class TestEnUS(unittest.TestCase):
             99,
         ]
 
-        self.fake.seed_instance(1143)
+        self.fake.seed_instance(2432)
         ssn = self.fake.ssn(taxpayer_identification_number_type="INVALID_SSN")
 
         assert len(ssn) == 11
@@ -358,7 +519,7 @@ class TestEnUS(unittest.TestCase):
 
         assert 900 <= int(area) <= 999 and int(group) not in itin_group_numbers
 
-        self.fake.seed_instance(9)
+        self.fake.seed_instance(0)
         ssn = self.fake.ssn(taxpayer_identification_number_type="INVALID_SSN")
         [area, group, serial] = ssn.split("-")
 
@@ -526,6 +687,29 @@ class TestEnUS(unittest.TestCase):
             self.fake.ssn(taxpayer_identification_number_type="ssn")
 
 
+class TestEsCL(unittest.TestCase):
+    def setUp(self):
+        self.fake = Faker("es_CL")
+        Faker.seed(0)
+
+    def test_rut(self):
+        for _ in range(100):
+            rut = self.fake.rut(min=10000000)
+            digits, check_digit = self._extract_digits(rut)
+
+            assert len(rut) == 12
+            assert check_digit == cl_rut_checksum(digits)
+
+    @staticmethod
+    def _extract_digits(rut) -> Tuple[int, str]:
+        """Extracts the digits and check digit from a formatted RUT."""
+        char_filter = re.compile(r"[^0-9]")
+        check_digit = rut[-1]
+        digits = char_filter.sub("", rut[:-1])
+
+        return int(digits), check_digit
+
+
 class TestEsCO(unittest.TestCase):
     def setUp(self):
         self._NUIP_REGEX: Pattern = re.compile(r"1[012]\d{8}|[1-9]\d{6,7}")
@@ -598,8 +782,15 @@ class TestEsES(unittest.TestCase):
         for _ in range(100):
             assert is_cif(self.fake.cif())
 
-    def test_doi(self):
-        assert len(self.fake.doi()) == 9
+    def test_nuss(self):
+        for _ in range(50):
+            nuss = self.fake.nuss()
+            assert isinstance(nuss, str)
+            assert 12 == len(nuss)
+        for _ in range(50):
+            nuss = self.fake.nuss(company=True)
+            assert isinstance(nuss, str)
+            assert 11 == len(nuss)
 
 
 class TestEsCA(TestEsES):
@@ -608,8 +799,8 @@ class TestEsCA(TestEsES):
         Faker.seed(0)
 
 
-class TestEsMX(unittest.TestCase):
-    def setUp(self):
+class TestEsMX:
+    def setup_method(self):
         self.fake = Faker("es_MX")
         Faker.seed(0)
 
@@ -643,12 +834,33 @@ class TestEsMX(unittest.TestCase):
             assert len(rfc) == 12
             assert re.search(r"^[A-Z]{3}\d{6}[0-9A-Z]{3}$", rfc)
 
+    @pytest.mark.parametrize(
+        "gender,pattern",
+        [
+            ("M", r"^[A-Z]{6}\d{8}M\d{3}$"),
+            ("H", r"^[A-Z]{6}\d{8}H\d{3}$"),
+            (None, r"^[A-Z]{6}\d{8}[HM]\d{3}$"),
+        ],
+        ids=["woman", "man", "any"],
+    )
+    def test_elector_code(self, gender, pattern):
+        for _ in range(100):
+            elector_code = self.fake.elector_code(gender=gender)
+
+            assert len(elector_code) == 18
+            assert re.search(pattern, elector_code)
+
+    def test_elector_code_unsupported_gender(self):
+        with pytest.raises(ValueError, match="Gender must be"):
+            self.fake.elector_code("Z")
+
 
 class TestEtEE(unittest.TestCase):
     """Tests SSN in the et_EE locale"""
 
     def setUp(self):
         self.fake = Faker("et_EE")
+
         Faker.seed(0)
 
     def test_ssn_checksum(self):
@@ -659,14 +871,12 @@ class TestEtEE(unittest.TestCase):
 
     @freezegun.freeze_time("2019-03-11")
     def test_ssn(self):
-        self.fake.random = random2.Random()
-
-        self.fake.seed_instance(0)
+        self.fake.seed_instance(1)
         value = self.fake.ssn()
         assert re.search(r"^\d{11}$", value)
         assert not value.endswith("0")
 
-        self.fake.seed_instance(5)
+        self.fake.seed_instance(0)
         value = self.fake.ssn()
 
         assert re.search(r"^\d{11}$", value)
@@ -674,8 +884,6 @@ class TestEtEE(unittest.TestCase):
 
     @freezegun.freeze_time("2002-01-01")
     def test_ssn_2000(self):
-        self.fake.random = random2.Random()
-
         self.fake.seed_instance(0)
         value = self.fake.ssn(min_age=0, max_age=1)
         assert re.search(r"^\d{11}$", value)
@@ -683,8 +891,6 @@ class TestEtEE(unittest.TestCase):
 
     @freezegun.freeze_time("2101-01-01")
     def test_ssn_2100(self):
-        self.fake.random = random2.Random()
-
         self.fake.seed_instance(0)
         value = self.fake.ssn(min_age=0, max_age=1)
         assert re.search(r"^\d{11}$", value)
@@ -733,22 +939,24 @@ class TestFiFI(unittest.TestCase):
         for _ in range(100):
             assert re.search(r"^FI\d{8}$", self.fake.vat_id())
 
+    @freezegun.freeze_time("2023-10-23")
+    def test_ssn_without_age_range(self):
+        current_year = 2023
+        age = current_year - 1995
+        ssn = self.fake.ssn(min_age=age, max_age=age, artificial=True)
+        assert "95-" in ssn
+        age = current_year - 2013
+        ssn = self.fake.ssn(min_age=age, max_age=age, artificial=True)
+        assert "13A" in ssn
+        age = current_year - 1898
+        ssn = self.fake.ssn(min_age=age, max_age=age, artificial=True)
+        assert "98+" in ssn
 
-class TestFrFR(unittest.TestCase):
-    def setUp(self):
-        self.fake = Faker("fr_FR")
+
+class TestFilPh(TestEnPh):
+    def setup_faker(self):
+        self.fake = Faker("fil_PH")
         Faker.seed(0)
-
-    def test_vat_id(self):
-        for _ in range(100):
-            assert re.search(r"^FR[\w\d]{2} \d{9}$", self.fake.vat_id())
-
-    def test_ssn(self) -> None:
-        for _ in range(100):
-            assert re.search(r"^\d{15}$", self.fake.ssn())
-
-    def test_checksum(self) -> None:
-        assert fr_calculate_checksum(2570533063999) == 3
 
 
 class TestFrCH:
@@ -780,17 +988,40 @@ class TestFrCH:
             assert result == expected
 
 
-class TestEnGB(unittest.TestCase):
+class TestFrDz(TestArDz):
     def setUp(self):
-        self.fake = Faker("en_GB")
+        self.fake = Faker("fr_DZ")
+        Faker.seed(0)
+
+
+class TestFrFR(unittest.TestCase):
+    def setUp(self):
+        self.fake = Faker("fr_FR")
         Faker.seed(0)
 
     def test_vat_id(self):
         for _ in range(100):
-            assert re.search(
-                r"^GB\d{3} \d{4} \d{2}(?: \d{3})?$|^GB(?:GD|HA)\d{3}$",
-                self.fake.vat_id(),
-            )
+            assert re.search(r"^FR[\w\d]{2} \d{9}$", self.fake.vat_id())
+
+    def test_ssn(self) -> None:
+        for _ in range(100):
+            # 5 birth digits, then either 8 numeric locality digits or Corsica's 2A/2B + 6 digits, then checksum.
+            assert re.search(r"^\d{5}(?:\d{8}|2[AB]\d{6})\d{2}$", self.fake.ssn())
+
+    def test_checksum(self) -> None:
+        assert fr_calculate_checksum("2570533063999") == 3
+        assert fr_calculate_checksum(2570533063999) == 3
+        assert fr_calculate_checksum("100012A004001") == 11
+        assert fr_calculate_checksum("100012B033001") == 41
+
+    def test_ssn_can_generate_corsican_department_codes(self) -> None:
+        with mock.patch.object(
+            fr_Provider,
+            "random_element",
+            return_value=("2A", "004", "Corse-du-Sud", "Ajaccio"),
+        ):
+            with mock.patch.object(fr_Provider, "random_int", side_effect=[1, 0, 1, 1]):
+                assert self.fake.ssn() == "100012A00400111"
 
 
 class TestHrHR(unittest.TestCase):
@@ -850,30 +1081,102 @@ class TestHuHU(unittest.TestCase):
             assert re.search(r"^HU\d{8}$", self.fake.vat_id())
 
 
-class TestPtBR(unittest.TestCase):
+class TestItIT(unittest.TestCase):
     def setUp(self):
-        self.fake = Faker("pt_BR")
+        self.fake = Faker("it_IT")
         Faker.seed(0)
 
-    def test_pt_BR_ssn_checksum(self):
-        assert pt_checksum([8, 8, 2, 8, 2, 1, 6, 5, 2]) == 2
-        assert pt_checksum([8, 8, 2, 8, 2, 1, 6, 5, 2, 2]) == 0
+    def test_cie(self):
+        pattern = re.compile(r"^[A-Z]{2}\d{5}[A-Z]{2}$")
 
-    def test_pt_BR_ssn(self):
         for _ in range(100):
-            assert re.search(r"^\d{11}$", self.fake.ssn())
+            cie_code = self.fake.cie()
+            assert pattern.fullmatch(cie_code)
 
-    def test_pt_BR_cpf(self):
+    def test_vat_id(self):
         for _ in range(100):
-            assert re.search(r"\d{3}\.\d{3}\.\d{3}-\d{2}", self.fake.cpf())
+            vat_id = self.fake.vat_id()
+            assert re.search(r"^IT\d{11}$", vat_id)
+            # the last digit is a Luhn check digit over the first ten digits
+            assert luhn_checksum(int(vat_id[2:])) == 0
+            # digits 8-10 identify a valid VAT office
+            office = int(vat_id[9:12])
+            assert 1 <= office <= 100 or office in (120, 121, 888, 999)
 
-    def test_pt_BR_rg(self):
+    def test_ssn(self):
         for _ in range(100):
-            to_test = self.fake.rg()
-            if "X" in to_test:
-                assert re.search(r"^\d{8}X", to_test)
-            else:
-                assert re.search(r"^\d{9}$", to_test)
+            assert re.search(r"^[A-Z]{6}\d{2}[ABCDEHLMPRST][0-7]\d[A-Z]\d{3}[A-Z]$", self.fake.ssn())
+
+    def test_checksum(self) -> None:
+        assert it_checksum("MDDMRA80L41H501") == "R"
+
+    def test_ssn_with_latin_chars(self):
+        generator = Factory.create("it_IT")
+        generator.last_name = mock.MagicMock(return_value="Foà")
+        ssn = generator.ssn()
+        self.assertEqual(len(ssn), 16)
+        self.assertEqual(ssn[:3], "FOA")
+
+
+class TestLvLV(unittest.TestCase):
+    num_sample_runs = 10
+
+    def setUp(self):
+        self.fake = Faker("lv_LV")
+        Faker.seed(0)
+        self.samples = [self.fake.ssn() for _ in range(self.num_sample_runs)]
+        self.provider = lv_Provider
+
+    def test_century_code(self):
+        assert self.provider._get_century_code(1900) == 1
+        assert self.provider._get_century_code(1999) == 1
+        assert self.provider._get_century_code(2000) == 2
+        assert self.provider._get_century_code(2999) == 2
+        assert self.provider._get_century_code(1800) == 0
+        assert self.provider._get_century_code(1899) == 0
+        with pytest.raises(ValueError):
+            self.provider._get_century_code(1799)
+        with pytest.raises(ValueError):
+            self.provider._get_century_code(3000)
+
+    def test_ssn_sanity(self):
+        for age in range(100):
+            self.fake.ssn(min_age=age, max_age=age + 1)
+
+    def check_length(self):
+        for sample in self.samples:
+            assert len(sample) == 12
+
+    def test_vat_id(self):
+        for _ in range(100):
+            assert re.search(r"^LV\d{11}$", self.fake.vat_id())
+
+
+class TestNlBE(unittest.TestCase):
+    def setUp(self):
+        self.fake = Faker("nl_BE")
+        Faker.seed(0)
+
+    def test_ssn(self):
+        for _ in range(1000):
+            ssn = self.fake.ssn()
+            assert len(ssn) == 11
+            gen_seq = ssn[6:9]
+            gen_chksum = ssn[9:11]
+            gen_seq_as_int = int(gen_seq)
+            gen_chksum_as_int = int(gen_chksum)
+            # Check that the sequence nr is between 1 inclusive and 998 inclusive
+            assert gen_seq_as_int > 0
+            assert gen_seq_as_int <= 998
+
+            # validate checksum calculation
+            # Since the century is not part of ssn, try both below and above year 2000
+            ssn_below = int(ssn[0:9])
+            chksum_below = 97 - (ssn_below % 97)
+            ssn_above = ssn_below + 2000000000
+            chksum_above = 97 - (ssn_above % 97)
+            results = [chksum_above, chksum_below]
+            assert gen_chksum_as_int in results
 
 
 class TestNlNL(unittest.TestCase):
@@ -968,46 +1271,255 @@ class TestPlPL(unittest.TestCase):
             assert re.search(r"^PL\d{10}$", self.fake.vat_id())
 
 
-class TestEnPh(unittest.TestCase):
-    num_sample_runs = 1000
+class TestPtBR(unittest.TestCase):
+    def setUp(self):
+        self.fake = Faker("pt_BR")
+        Faker.seed(0)
+
+    def test_pt_BR_ssn_checksum(self):
+        assert pt_checksum([8, 8, 2, 8, 2, 1, 6, 5, 2]) == 2
+        assert pt_checksum([8, 8, 2, 8, 2, 1, 6, 5, 2, 2]) == 0
+
+    def test_pt_BR_ssn(self):
+        for _ in range(100):
+            assert re.search(r"^\d{11}$", self.fake.ssn())
+
+    def test_pt_BR_cpf(self):
+        for _ in range(100):
+            assert re.search(r"\d{3}\.\d{3}\.\d{3}-\d{2}", self.fake.cpf())
+
+    def test_pt_BR_rg(self):
+        for _ in range(100):
+            to_test = self.fake.rg()
+            if "X" in to_test:
+                assert re.search(r"^\d{8}X", to_test)
+            else:
+                assert re.search(r"^\d{9}$", to_test)
+
+    def test_pt_BR_ssn_allows_repeated_digits(self):
+        # Regression test for the nine base digits being drawn with
+        # random.sample(), which never repeated a digit among them and shrank
+        # the CPF space from 10 ** 9 down to about 0.36 % of it. They must be
+        # drawn independently, since a real CPF has no uniqueness requirement.
+        has_repeated_digit = any(len(set(self.fake.ssn()[:9])) < 9 for _ in range(1000))
+        assert has_repeated_digit
+
+    def test_pt_BR_ssn_checksum_stays_valid(self):
+        for _ in range(1000):
+            digits = [int(c) for c in self.fake.ssn()]
+            assert pt_checksum(digits[:9]) == digits[9]
+            assert pt_checksum(digits[:10]) == digits[10]
+
+    def test_pt_BR_rg_uses_full_digit_range_and_repeats(self):
+        # Regression test for the eight base digits being drawn with
+        # random.sample(range(0, 9), 8), which both excluded the digit 9 and
+        # forced the eight digits to be distinct.
+        base_digits = set()
+        has_repeated_digit = False
+        for _ in range(1000):
+            base = self.fake.rg()[:8]
+            base_digits.update(base)
+            has_repeated_digit = has_repeated_digit or len(set(base)) < 8
+        assert base_digits == set("0123456789")
+        assert has_repeated_digit
+
+
+class TestRoRO(unittest.TestCase):
+    """Tests SSN in the ro_RO locale"""
 
     def setUp(self):
-        self.sss_pattern: Pattern = re.compile(r"^\d{2}-\d{7}-\d$")
-        self.gsis_pattern: Pattern = re.compile(r"^\d{11}$")
-        self.philhealth_pattern: Pattern = re.compile(r"^\d{2}-\d{9}-\d$")
-        self.pagibig_pattern: Pattern = re.compile(r"^\d{4}-\d{4}-\d{4}$")
-        self.umid_pattern: Pattern = re.compile(r"^\d{4}-\d{7}-\d$")
-        self.setup_faker()
-
-    def setup_faker(self):
-        self.fake = Faker("en_PH")
+        self.fake = Faker("ro_RO")
         Faker.seed(0)
 
-    def test_PH_sss(self):
-        for i in range(self.num_sample_runs):
-            assert self.sss_pattern.match(self.fake.sss())
+    def test_ssn_checksum(self):
+        assert ro_ssn_checksum("188050510739") == 0
+        assert ro_ssn_checksum("181111512587") == 1
+        assert ro_ssn_checksum("190123152499") == 2
+        assert ro_ssn_checksum("601100452314") == 3
+        assert ro_ssn_checksum("296072904713") == 4
+        assert ro_ssn_checksum("601100452314") == 3
+        assert ro_ssn_checksum("192080516368") == 6
+        assert ro_ssn_checksum("602041144519") == 7
+        assert ro_ssn_checksum("197061731387") == 8
+        assert ro_ssn_checksum("294112120140") == 9
 
-    def test_PH_gsis(self):
-        for i in range(self.num_sample_runs):
-            assert self.gsis_pattern.match(self.fake.gsis())
+    def test_ssn(self):
+        for _ in range(100):
+            assert re.search(r"^\d{13}$", self.fake.ssn())
 
-    def test_PH_philhealth(self):
-        for i in range(self.num_sample_runs):
-            assert self.philhealth_pattern.match(self.fake.philhealth())
+    def test_ssn_birth_date_is_valid(self):
+        # The CNP encodes a birth date as S YY MM DD; those digits must form a
+        # real calendar date. The century (needed for leap years) follows the
+        # gender digit S.
+        centuries = {1: 1900, 2: 1900, 3: 1800, 4: 1800, 5: 2000, 6: 2000}
+        for _ in range(1000):
+            ssn = self.fake.ssn()
+            gender, year, month, day = int(ssn[0]), int(ssn[1:3]), int(ssn[3:5]), int(ssn[5:7])
+            # datetime raises ValueError on an impossible date (e.g. 09-31, 02-30).
+            datetime(centuries.get(gender, 1900) + year, month, day)
 
-    def test_PH_pagibig(self):
-        for i in range(self.num_sample_runs):
-            assert self.pagibig_pattern.match(self.fake.pagibig())
+    def test_vat_checksum(self):
+        assert ro_vat_checksum("1") == 9
+        assert ro_vat_checksum("41") == 8
+        assert ro_vat_checksum("181") == 2
+        assert ro_vat_checksum("82421") == 5
+        assert ro_vat_checksum("424694") == 7
+        assert ro_vat_checksum("3918774") == 6
+        assert ro_vat_checksum("99380784") == 1
+        assert ro_vat_checksum("971775895") == 8
 
-    def test_PH_umid(self):
-        for i in range(self.num_sample_runs):
-            assert self.umid_pattern.match(self.fake.umid())
+    def test_vat_id(self):
+        for _ in range(100):
+            vat = self.fake.vat_id().replace("RO", "")
+            assert vat.isdigit()
+            assert len(vat) >= 2 and len(vat) <= 10
 
 
-class TestFilPh(TestEnPh):
-    def setup_faker(self):
-        self.fake = Faker("fil_PH")
+class TestSkSK(unittest.TestCase):
+    def setUp(self):
+        self.fake = Faker("sk_SK")
         Faker.seed(0)
+
+    def test_vat_id(self):
+        for _ in range(100):
+            assert re.search(r"^SK\d{10}$", self.fake.vat_id())
+
+    def test_birth_number(self):
+        for _ in range(100):
+            birth_number = self.fake.birth_number()
+            assert len(birth_number) in [10, 11]
+            assert birth_number[6] == "/"
+            assert int(birth_number.replace("/", "")) % 11 == 0
+
+
+class TestSrBA(unittest.TestCase):
+    def setUp(self):
+        self.fake = Faker("sr_BA")
+        Faker.seed(0)
+
+    def test_ssn(self):
+        for _ in range(200):
+            ssn = self.fake.ssn()
+            assert re.search(r"^\d{13}$", ssn)
+
+            day = int(ssn[0:2])
+            month = int(ssn[2:4])
+            registration_area = int(ssn[7:9])
+            checksum = int(ssn[-1])
+
+            assert 1 <= day <= 31
+            assert 1 <= month <= 12
+            assert 10 <= registration_area <= 19
+            assert sr_ba_calculate_checksum(ssn[:-1]) == checksum
+
+
+class TestSvSE(unittest.TestCase):
+    def setUp(self):
+        self.fake = Faker("sv_SE")
+        Faker.seed(0)
+
+    def partial_sum(self, number, mult_factor):
+        quotient, remainder = divmod(number * mult_factor, 10)
+        return quotient + remainder
+
+    def ssn_checksum(self, ssn):
+        """Validates the checksum digit and returns a Boolean"""
+        ssn = ssn.replace("-", "")
+        if len(ssn) == 12:
+            ssn = ssn[2:]
+        if len(ssn) != 10:
+            return False
+
+        mult_factors = cycle([2, 1])
+        final_sum = sum(self.partial_sum(int(char), mf) for char, mf in zip(ssn[:9], mult_factors))
+        chksum = -final_sum % 10
+        return chksum == int(ssn[-1])
+
+    def validate_date_string(self, date_str):
+        date_len = len(date_str)
+        if date_len == 6:
+            year_fmt = "%y"
+        elif date_len == 8:
+            year_fmt = "%Y"
+        else:
+            return False
+
+        try:
+            if date_str != datetime.strptime(date_str, f"{year_fmt}%m%d").strftime(f"{year_fmt}%m%d"):
+                raise ValueError
+            return True
+        except ValueError:
+            return False
+
+    def test_pers_id_short_with_dash(self):
+        """Regression case that ensures previous implementations work as-is"""
+        for _ in range(100):
+            pers_id = self.fake.ssn()
+            assert re.search(r"\d{6}-\d{4}", pers_id)
+            assert self.validate_date_string(pers_id[:6]) is True
+            assert self.ssn_checksum(pers_id) is True
+
+    def test_pers_id_short_no_dash(self):
+        for _ in range(100):
+            pers_id = self.fake.ssn(dash=False)
+            assert re.search(r"\d{10}", pers_id)
+            assert self.validate_date_string(pers_id[:6]) is True
+            assert self.ssn_checksum(pers_id) is True
+
+    def test_pers_id_long_with_dash(self):
+        for _ in range(100):
+            pers_id = self.fake.ssn(long=True)
+            assert re.search(r"\d{8}-\d{4}", pers_id)
+            assert self.validate_date_string(pers_id[:8]) is True
+            assert self.ssn_checksum(pers_id) is True
+
+    def test_pers_id_long_no_dash(self):
+        for _ in range(100):
+            pers_id = self.fake.ssn(long=True, dash=False)
+            assert re.search(r"\d{12}", pers_id)
+            assert self.validate_date_string(pers_id[:8]) is True
+            assert self.ssn_checksum(pers_id) is True
+
+    def test_org_id_short_with_dash(self):
+        for _ in range(100):
+            org_id = self.fake.org_id()
+            assert re.search(r"\d{6}-\d{4}", org_id)
+            assert int(org_id[2:4]) >= 20
+            assert self.ssn_checksum(org_id) is True
+
+    def test_org_id_short_no_dash(self):
+        for _ in range(100):
+            org_id = self.fake.org_id(dash=False)
+            assert re.search(r"\d{10}", org_id)
+            assert int(org_id[2:4]) >= 20
+            assert self.ssn_checksum(org_id) is True
+
+    def test_org_id_long_with_dash(self):
+        for _ in range(100):
+            org_id = self.fake.org_id(long=True)
+            assert re.search(r"\d{8}-\d{4}", org_id)
+            assert int(org_id[4:6]) >= 20
+            assert self.ssn_checksum(org_id) is True
+
+    def test_org_id_long_no_dash(self):
+        for _ in range(100):
+            org_id = self.fake.org_id(long=True, dash=False)
+            assert re.search(r"\d{12}", org_id)
+            assert int(org_id[4:6]) >= 20
+            assert self.ssn_checksum(org_id) is True
+
+    def test_vat_id(self):
+        for _ in range(100):
+            vat_id = self.fake.vat_id()
+            assert re.search(r"SE\d{12}", vat_id)
+            assert int(vat_id[2]) in (1, 2, 3, 5, 6, 7, 8, 9)
+            assert int(vat_id[6:8]) >= 20
+
+    def test_org_and_vat_id(self):
+        for _ in range(100):
+            oid, vid = self.fake.org_and_vat_id()
+            assert oid.replace("-", "")[-10:] == vid[4:-2]
+            assert re.search(r"SE\d{12}", vid)
 
 
 class TestThTH(unittest.TestCase):
@@ -1034,39 +1546,56 @@ class TestTrTr(unittest.TestCase):
     num_sample_runs = 10
 
     def setUp(self):
+        Faker.seed(0)
         self.fake = Faker("tr_TR")
         self.samples = [self.fake.ssn() for _ in range(self.num_sample_runs)]
-        Faker.seed(0)
 
-    def first_part_non_zero(self):
+    def test_first_part_non_zero(self):
         for sample in self.samples:
-            assert sample[0] != 0
+            self.assertNotEqual(sample[0], "0")
 
-    def compare_first_ten_and_last_part(self):
+    def test_eleventh_digit_matches_sum_mod_10(self):
         for sample in self.samples:
             first_ten_number = sample[:-1]
-            last_part = sample[-1]
-            assert sum(int(x) for x in f"{first_ten_number}") % 10 == last_part
+            last_part = int(sample[-1])
+            total_sum = sum(int(x) for x in first_ten_number)
+            self.assertEqual(total_sum % 10, last_part)
+
+    def test_tenth_digit_correct(self):
+        for sample in self.samples:
+            digits = [int(d) for d in sample]
+            odd_sum = sum(digits[i] for i in [0, 2, 4, 6, 8])
+            even_sum = sum(digits[i] for i in [1, 3, 5, 7])
+            tenth_digit = digits[9]
+            expected_tenth = ((odd_sum * 7) - even_sum) % 10
+            self.assertEqual(tenth_digit, expected_tenth)
 
 
-class TestEnIn(unittest.TestCase):
+class TestUkUA(unittest.TestCase):
     def setUp(self):
-        self.fake = Faker("en_IN")
+        self.fake = Faker("uk_Ua")
         Faker.seed(0)
-        test_samples = 10
-        self.aadhaar_ids = [self.fake.aadhaar_id() for _ in range(test_samples)]
+        self.provider = uk_Provider
 
-    def test_length(self):
-        for aadhaar_id in self.aadhaar_ids:
-            assert len(aadhaar_id) == 12
+    def test_ssn_len(self):
+        assert len(self.fake.ssn()) == 10
 
-    def test_first_digit_non_zero(self):
-        for aadhar_id in self.aadhaar_ids:
-            assert aadhar_id[0] != "0"
+    def test_start_ssn(self):
+        assert self.fake.ssn("21-06-1994")[:5] == "34505"
 
-    def test_valid_luhn(self):
-        for aadhaar_id in self.aadhaar_ids:
-            assert luhn_checksum(aadhaar_id) == 0
+    def test_ssn_gender(self):
+        m = self.fake.ssn(gender="M")
+        w = self.fake.ssn(gender="F")
+        assert int(m[8]) % 2 != 0, "Must be odd for men"
+        assert int(w[8]) % 2 == 0, "Must be even for women"
+
+    def test_incorrect_birthday(self):
+        with pytest.raises(ValueError):
+            self.fake.ssn(birthday="1994-06-01")
+
+    def test_incorrect_gender(self):
+        with pytest.raises(ValueError):
+            self.fake.ssn(gender="f")
 
 
 class TestZhCN(unittest.TestCase):
@@ -1095,55 +1624,71 @@ class TestZhCN(unittest.TestCase):
         ssn = self.fake.ssn(gender="M")
         assert int(ssn[16]) % 2 == 1
 
+    def test_zh_CN_ssn_invalid_area_code_passed(self):
+        ssn = self.fake.ssn(area_code=12)
+        assert int(ssn[0:6]) > 0
 
-class TestRoRO(unittest.TestCase):
-    """Tests SSN in the ro_RO locale"""
+        ssn = self.fake.ssn(area_code={})
+        assert int(ssn[0:6]) > 0
 
-    def setUp(self):
-        self.fake = Faker("ro_RO")
-        Faker.seed(0)
+        ssn = self.fake.ssn(area_code=[])
+        assert int(ssn[0:6]) > 0
 
-    def test_ssn_checksum(self):
-        assert ro_ssn_checksum("188050510739") == 0
-        assert ro_ssn_checksum("181111512587") == 1
-        assert ro_ssn_checksum("190123152499") == 2
-        assert ro_ssn_checksum("601100452314") == 3
-        assert ro_ssn_checksum("296072904713") == 4
-        assert ro_ssn_checksum("601100452314") == 3
-        assert ro_ssn_checksum("192080516368") == 6
-        assert ro_ssn_checksum("602041144519") == 7
-        assert ro_ssn_checksum("197061731387") == 8
-        assert ro_ssn_checksum("294112120140") == 9
+        ssn = self.fake.ssn(area_code=None)
+        assert int(ssn[0:6]) > 0
 
-    def test_ssn(self):
-        for _ in range(100):
-            assert re.search(r"^\d{13}$", self.fake.ssn())
+        ssn = self.fake.ssn()
+        assert int(ssn[0:6]) > 0
 
-    def test_vat_checksum(self):
-        assert ro_vat_checksum("1") == 9
-        assert ro_vat_checksum("41") == 8
-        assert ro_vat_checksum("181") == 2
-        assert ro_vat_checksum("82421") == 5
-        assert ro_vat_checksum("424694") == 7
-        assert ro_vat_checksum("3918774") == 6
-        assert ro_vat_checksum("99380784") == 1
-        assert ro_vat_checksum("971775895") == 8
+    def test_zh_CN_ssn_area_code_passed(self):
+        #
+        ssn = self.fake.ssn(area_code="654225")
+        assert int(ssn[0:6]) == 654225
 
-    def test_vat_id(self):
-        for _ in range(100):
-            vat = self.fake.vat_id().replace("RO", "")
-            assert vat.isdigit()
-            assert len(vat) >= 2 and len(vat) <= 10
+        ssn = self.fake.ssn(area_code="820000")
+        assert int(ssn[0:6]) == 820000
+
+        ssn = self.fake.ssn(area_code="830000")
+        assert int(ssn[0:6]) == 830000
 
 
-class TestAzAz(unittest.TestCase):
+class TestZhTW(unittest.TestCase):
     num_sample_runs = 10
 
     def setUp(self):
-        self.fake = Faker("az_AZ")
+        self.fake = Faker("zh_TW")
+        Faker.seed(0)
         self.samples = [self.fake.ssn() for _ in range(self.num_sample_runs)]
+
+    def test_length(self):
+        for sample in self.samples:
+            assert len(sample) == 10
+
+    def test_gender(self):
+        """only '1' and '2' are allowed in the second char"""
+        for sample in self.samples:
+            assert sample[1] == "1" or sample[1] == "2"
+
+    def test_checksum(self):
+        for sample in self.samples:
+            assert tw_checksum(sample) % 10 == 0
+
+
+class TestMkMk(unittest.TestCase):
+    """Tests SSN (EMBG) in the mk_MK locale"""
+
+    def setUp(self):
+        self.fake = Faker("mk_MK")
         Faker.seed(0)
 
-    def check_length(self):
-        for sample in self.samples:
-            assert len(sample) == 7
+    def test_ssn_format(self):
+        for _ in range(100):
+            ssn = self.fake.ssn()
+            assert re.match(r"^\d{13}$", ssn), f"EMBG {ssn!r} is not 13 digits"
+
+    def test_ssn_checksum(self):
+        for _ in range(100):
+            ssn = self.fake.ssn()
+            digits = [int(c) for c in ssn[:12]]
+            expected_check = MkMKSsnProvider._checksum(digits)
+            assert int(ssn[12]) == expected_check, f"Bad checksum in {ssn}"

@@ -1,11 +1,19 @@
 import inspect
 import warnings
 
-from typing import Any, Dict, List, Optional, Tuple, Union
+from enum import Enum, auto
+from typing import Any, Dict, List, Optional, Tuple, Type, Union
 
 from .generator import Generator
 from .providers import BaseProvider
 from .proxy import Faker
+
+
+class FakerEnum(Enum):
+    """Required for faker.providers.enum"""
+
+    A = auto
+    B = auto
 
 
 class Documentor:
@@ -30,7 +38,7 @@ class Documentor:
         formatters = []
         providers: List[BaseProvider] = self.generator.get_providers()
         for provider in providers[::-1]:  # reverse
-            if locale and provider.__lang__ != locale:
+            if locale and provider.__lang__ and provider.__lang__ != locale:
                 continue
             formatters.append(
                 (provider, self.get_provider_formatters(provider, **kwargs)),
@@ -52,7 +60,7 @@ class Documentor:
                 continue
 
             arguments = []
-            faker_args: List[str] = []
+            faker_args: List[Union[str, Type[Enum]]] = []
             faker_kwargs = {}
 
             if name == "binary":
@@ -65,15 +73,16 @@ class Documentor:
                     }
                 )
 
+            if name == "enum":
+                faker_args = [FakerEnum]
+
             if with_args:
                 # retrieve all parameter
                 argspec = inspect.getfullargspec(method)
 
                 lst = [x for x in argspec.args if x not in ["self", "cls"]]
                 for i, arg in enumerate(lst):
-
                     if argspec.defaults and with_defaults:
-
                         try:
                             default = argspec.defaults[i]
                             if isinstance(default, str):
@@ -103,12 +112,12 @@ class Documentor:
             try:
                 # make a fake example
                 example = self.generator.format(name, *faker_args, **faker_kwargs)
-            except (AttributeError, ValueError) as e:
+            except (AttributeError, ValueError, NotImplementedError) as e:
                 warnings.warn(str(e))
                 continue
             formatters[signature] = example
 
-            self.max_name_len = max(self.max_name_len, len(signature))
+            self.max_name_len = max(self.max_name_len, *(len(part) for part in signature.split()))
             self.already_generated.append(name)
 
         return formatters

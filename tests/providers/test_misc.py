@@ -1,4 +1,5 @@
 import csv
+import datetime
 import io
 import itertools
 import json
@@ -6,12 +7,18 @@ import re
 import tarfile
 import unittest
 import uuid
+import xml
 import zipfile
 
 try:
     import PIL.Image
 except ImportError:
     PIL = None
+
+try:
+    import xmltodict
+except ImportError:
+    xmltodict = None
 
 from typing import Pattern
 from unittest.mock import patch
@@ -51,6 +58,9 @@ class _FooBarProvider:
     def test_float(self, multi=1) -> float:
         return 1.1 * multi
 
+    def test_date_time(self) -> datetime.datetime:
+        return datetime.datetime(2022, 12, 22, 13, 42, 33, 123)
+
 
 class TestMiscProvider:
     """Test miscellaneous provider methods"""
@@ -79,6 +89,54 @@ class TestMiscProvider:
             expected_uuids = [faker.uuid4() for _ in range(100)]
             faker.seed_instance(random_seed)
             new_uuids = [faker.uuid4() for _ in range(100)]
+            assert new_uuids == expected_uuids
+
+    def test_uuid1_str(self, faker, num_samples):
+        pattern: Pattern = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-1[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}")
+        for _ in range(num_samples):
+            assert pattern.fullmatch(faker.uuid1())
+
+    def test_uuid1_int(self, faker, num_samples):
+        for _ in range(num_samples):
+            assert isinstance(faker.uuid1(cast_to=int), int)
+
+    def test_uuid1_uuid_object(self, faker, num_samples):
+        for _ in range(num_samples):
+            uuid1 = faker.uuid1(cast_to=None)
+            assert isinstance(uuid1, uuid.UUID)
+            assert uuid1.version == 1
+
+    def test_uuid1_seedability(self, faker, num_samples):
+        for _ in range(num_samples):
+            random_seed = faker.random_int()
+            faker.seed_instance(random_seed)
+            expected_uuids = [faker.uuid1() for _ in range(100)]
+            faker.seed_instance(random_seed)
+            new_uuids = [faker.uuid1() for _ in range(100)]
+            assert new_uuids == expected_uuids
+
+    def test_uuid7_str(self, faker, num_samples):
+        pattern: Pattern = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}")
+        for _ in range(num_samples):
+            assert pattern.fullmatch(faker.uuid7())
+
+    def test_uuid7_int(self, faker, num_samples):
+        for _ in range(num_samples):
+            assert isinstance(faker.uuid7(cast_to=int), int)
+
+    def test_uuid7_uuid_object(self, faker, num_samples):
+        for _ in range(num_samples):
+            uuid7 = faker.uuid7(cast_to=None)
+            assert isinstance(uuid7, uuid.UUID)
+            assert uuid7.version == 7
+
+    def test_uuid7_seedability(self, faker, num_samples):
+        for _ in range(num_samples):
+            random_seed = faker.random_int()
+            faker.seed_instance(random_seed)
+            expected_uuids = [faker.uuid7() for _ in range(100)]
+            faker.seed_instance(random_seed)
+            new_uuids = [faker.uuid7() for _ in range(100)]
             assert new_uuids == expected_uuids
 
     def test_zip_invalid_file(self, faker):
@@ -413,7 +471,7 @@ class TestMiscProvider:
     def test_dsv_data_columns(self, faker):
         num_rows = 10
         data_columns = ["{{name}}", "#??-####", "{{address}}", "{{phone_number}}"]
-        with patch.object(faker["en_US"], "pystr_format") as mock_pystr_format:
+        with patch.object(faker["en_US"].factories[0], "pystr_format") as mock_pystr_format:
             mock_pystr_format.assert_not_called()
             faker.dsv(data_columns=data_columns, num_rows=num_rows)
 
@@ -450,6 +508,20 @@ class TestMiscProvider:
             # Verify csv.writer was called with the remaining kwargs
             for args, kwargs in mock_writer.call_args_list:
                 assert kwargs == test_kwargs
+
+    @unittest.skipUnless(xmltodict, "requires the Python xmltodict Library")
+    def test_xml(self, faker):
+        try:
+            xml.etree.ElementTree.fromstring(faker.xml())
+        except xml.etree.ElementTree.ParseError:
+            raise AssertionError("The XML format is invalid.")
+
+    def test_xml_no_xmltodict(self, faker):
+        with patch.dict("sys.modules", {"xmltodict": None}):
+            with pytest.raises(exceptions.UnsupportedFeature) as excinfo:
+                faker.xml()
+
+            assert excinfo.value.name == "xml"
 
     def test_csv_helper_method(self, faker):
         kwargs = {
@@ -669,6 +741,36 @@ class TestMiscProvider:
 
         assert json_data["dict"]["item1"] == "FooBars"
         assert json_data["dict"]["item2"] == "FooBar"
+
+    def test_json_type_integrity_datetime_using_encoder(self, faker_with_foobar):
+        class DateTimeEncoder(json.JSONEncoder):
+            def default(self, obj):
+                if isinstance(obj, datetime.datetime):
+                    return str(obj)
+
+                # Let the base class default method raise the TypeError
+                return json.JSONEncoder.default(self, obj)
+
+        kwargs = {
+            "data_columns": {"item1": "test_date_time"},
+            "num_rows": 1,
+            "cls": DateTimeEncoder,
+        }
+        json_data = json.loads(faker_with_foobar.json(**kwargs))
+        assert isinstance(json_data["item1"], str)
+        assert json_data["item1"] == "2022-12-22 13:42:33.000123"
+
+    def test_json_type_integrity_datetime_no_encoder(self, faker_with_foobar):
+        kwargs = {"data_columns": {"item1": "test_date_time"}, "num_rows": 1}
+        with pytest.raises(TypeError):
+            faker_with_foobar.json(**kwargs)
+
+    def test_json_bytes(self, faker_with_foobar):
+        kwargs = {"data_columns": {"item1": "foo_bar"}, "num_rows": 1}
+        json_data_bytes = faker_with_foobar.json_bytes(**kwargs)
+        assert isinstance(json_data_bytes, bytes)
+        json_data = json.loads(json_data_bytes.decode())
+        assert json_data["item1"] == "FooBar"
 
     def test_fixed_width_with_arguments(self, faker_with_foobar):
         kwargs = {

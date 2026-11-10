@@ -2,7 +2,6 @@ from .. import Provider as AddressProvider
 
 
 class Provider(AddressProvider):
-
     street_prefixes = (
         "Av",
         "Avenida",
@@ -28,7 +27,7 @@ class Provider(AddressProvider):
 
     building_number_formats = ("S/N", "%", "%#", "%#", "%#", "%##")
 
-    postcode_formats = ("####-###",)
+    postcode_formats = ("%###-###",)
 
     cities = (
         "Abrantes",
@@ -326,7 +325,7 @@ class Provider(AddressProvider):
         "Lituânia",
         "Luxemburgo",
         "Macau",
-        "Macedónia",
+        "Macedónia do Norte",
         "Madagáscar",
         "Malásia",
         "Malávi",
@@ -1556,19 +1555,19 @@ class Provider(AddressProvider):
 
     def street_prefix(self) -> str:
         """
-        :example 'Rua'
+        :example: 'Rua'
         """
         return self.random_element(self.street_prefixes)
 
     def city_name(self) -> str:
         """
-        :example 'Amora'
+        :example: 'Amora'
         """
         return self.random_element(self.cities)
 
     def administrative_unit(self) -> str:
         """
-        :example 'Bragança'
+        :example: 'Bragança'
         """
         return self.random_element(self.distritos)
 
@@ -1576,18 +1575,18 @@ class Provider(AddressProvider):
 
     def concelho(self) -> str:
         """
-        :example 'Tondela'
+        :example: 'Tondela'
         """
         return self.random_element(self.concelhos)
 
     def freguesia(self) -> str:
         """
-        :example 'Miranda do Douro'
+        :example: 'Miranda do Douro'
         """
         return self.random_element(self.freguesias)
 
     def place_name(self) -> str:
         """
-        :example "do Pombal"
+        :example: "do Pombal"
         """
         return self.random_element(self.places)

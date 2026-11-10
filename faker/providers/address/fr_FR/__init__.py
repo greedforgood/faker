@@ -46,7 +46,6 @@ class Provider(AddressProvider):
     address_formats = ("{{street_address}}\n{{postcode}} {{city}}",)
 
     building_number_formats = ("%", "%#", "%#", "%#", "%##")
-    postcode_formats = ("#####",)
     countries = (
         "Afghanistan",
         "Afrique du sud",
@@ -170,7 +169,7 @@ class Provider(AddressProvider):
         "Lithuanie",
         "Luxembourg",
         "Macau",
-        "Macédoine",
+        "Macédoine du Nord",
         "Madagascar",
         "Malaisie",
         "Malawi",
@@ -428,19 +427,19 @@ class Provider(AddressProvider):
 
     def street_prefix(self) -> str:
         """
-        :example 'rue'
+        :example: 'rue'
         """
         return self.random_element(self.street_prefixes)
 
     def city_prefix(self) -> str:
         """
-        :example 'rue'
+        :example: 'rue'
         """
         return self.random_element(self.city_prefixes)
 
     def administrative_unit(self) -> str:
         """
-        :example 'Guadeloupe'
+        :example: 'Guadeloupe'
         """
         return self.random_element(self.regions)
 
@@ -449,14 +448,14 @@ class Provider(AddressProvider):
     def department(self) -> Tuple[str, str]:
         """
         Randomly returns a french department ('departmentNumber' , 'departmentName').
-        :example ('2B' . 'Haute-Corse')
+        :example: ('2B' . 'Haute-Corse')
         """
         return self.random_element(self.departments)
 
     def department_name(self) -> str:
         """
         Randomly returns a french department name.
-        :example 'Ardèche'
+        :example: 'Ardèche'
         """
         return self.department()[1]
 
@@ -464,6 +463,16 @@ class Provider(AddressProvider):
         """
         Randomly returns a french department number.
 
-        :example '59'
+        :example: '59'
         """
         return self.department()[0]
+
+    def postcode(self) -> str:
+        """
+        Randomly returns a postcode generated from existing french department number.
+        exemple: '33260'
+        """
+        department = self.department_number()
+        if department in ["2A", "2B"]:
+            department = "20"
+        return f"{department}{self.random_number(digits=5 - len(department), fix_len=True)}"

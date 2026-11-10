@@ -3,6 +3,8 @@ import string
 import sys
 import unittest
 
+from unittest.mock import MagicMock, patch
+
 import pytest
 
 from faker import Faker, Generator
@@ -23,6 +25,37 @@ class FactoryTestCase(unittest.TestCase):
         print_doc("address", output=output)
         print_doc("faker.providers.person.it_IT", output=output)
         assert output.getvalue()
+
+    def test_documentor_skips_unimplemented_formatters(self):
+        import warnings
+
+        from faker.documentor import Documentor
+        from faker.providers.bank import Provider as BankProvider
+
+        faker = Faker("bn_BD")
+        doc = Documentor(faker)
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            formatters = doc.get_provider_formatters(BankProvider(faker))
+
+        assert any("banks" in str(warning.message) for warning in caught)
+        assert "fake.bank()" not in formatters
+        assert any("bank_country" in signature for signature in formatters)
+
+    def test_print_provider_handles_non_utf_output(self):
+        from faker.cli import print_provider
+
+        doc = MagicMock()
+        doc.max_name_len = len("fake.emoji()")
+        doc.get_provider_name.return_value = "faker.providers.emoji"
+
+        output = io.TextIOWrapper(io.BytesIO(), encoding="cp950")
+        print_provider(doc, MagicMock(), {"fake.emoji()": "👩"}, output=output)
+        output.flush()
+
+        rendered = output.buffer.getvalue().decode("cp950")
+        assert "fake.emoji()" in rendered
+        assert "\\U0001f469" in rendered
 
     def test_command(self):
         from faker.cli import Command
@@ -108,6 +141,78 @@ class FactoryTestCase(unittest.TestCase):
         finally:
             sys.stdout = orig_stdout
 
+    def test_unknown_provider(self):
+        with pytest.raises(ModuleNotFoundError) as excinfo:
+            Factory.create(providers=["dummy_provider"])
+        assert str(excinfo.value) == "No module named 'dummy_provider'"
+
+        with pytest.raises(ModuleNotFoundError) as excinfo:
+            Factory.create(providers=["dummy_provider"], locale="it_IT")
+        assert str(excinfo.value) == "No module named 'dummy_provider'"
+
+    def test_unknown_locale(self):
+        with pytest.raises(AttributeError) as excinfo:
+            Factory.create(locale="77")
+        assert str(excinfo.value) == "Invalid configuration for faker locale `77`"
+
+        with pytest.raises(AttributeError) as excinfo:
+            Factory.create(locale="77_US")
+        assert str(excinfo.value) == "Invalid configuration for faker locale `77_US`"
+
+    def test_lang_unlocalized_provider(self):
+        for locale in (None, "", "en_GB", "it_IT"):
+            factory = Factory.create(providers=["faker.providers.file"], locale=locale)
+            assert len(factory.providers) == 1
+            assert factory.providers[0].__provider__ == "faker.providers.file"
+            assert factory.providers[0].__lang__ is None
+
+    def test_lang_localized_provider(self, with_default=True):
+        class DummyProviderModule:
+            localized = True
+
+            def __init__(self):
+                if with_default:
+                    self.default_locale = "ar_EG"
+
+            @property
+            def __name__(self):
+                return self.__class__.__name__
+
+            class Provider:
+                def __init__(self, *args, **kwargs):
+                    pass
+
+        # There's a cache based on the provider name, so when the provider changes behaviour we need
+        # a new name:
+        provider_path = f"test_lang_localized_provider_{with_default}"
+
+        with patch.multiple(
+            "faker.factory",
+            import_module=MagicMock(return_value=DummyProviderModule()),
+            list_module=MagicMock(return_value=("en_GB", "it_IT")),
+            DEFAULT_LOCALE="ko_KR",
+        ):
+            test_cases = [
+                (None, False),
+                ("", False),
+                ("ar", False),
+                ("es_CO", False),
+                ("en", False),
+                ("en_GB", True),
+                ("ar_EG", with_default),  # True if module defines a default locale
+            ]
+            for locale, expected_used in test_cases:
+                factory = Factory.create(providers=[provider_path], locale=locale)
+                assert factory.providers[0].__provider__ == provider_path
+                from faker.config import DEFAULT_LOCALE
+
+                print(f"requested locale = {locale} , DEFAULT LOCALE {DEFAULT_LOCALE}")
+                expected_locale = locale if expected_used else ("ar_EG" if with_default else "ko_KR")
+                assert factory.providers[0].__lang__ == expected_locale
+
+    def test_lang_localized_provider_without_default(self):
+        self.test_lang_localized_provider(with_default=False)
+
     def test_slugify(self):
         slug = text.slugify("a'b/c")
         assert slug == "abc"
@@ -154,7 +259,7 @@ class FactoryTestCase(unittest.TestCase):
         provider = Provider(self.generator)
 
         for _ in range(999):
-            length = random.randint(0, 2 ** 10)
+            length = random.randint(0, 2**10)
             binary = provider.binary(length)
 
             assert isinstance(binary, (bytes, bytearray))
@@ -270,41 +375,17 @@ class FactoryTestCase(unittest.TestCase):
         with pytest.raises(ValueError):
             assert fake.pyfloat(min_value=9999, max_value=9999)
 
-    def test_us_ssn_valid(self):
-        from faker.providers.ssn.en_US import Provider
+    def test_includes_does_not_mutate_default_providers(self):
+        """Regression test for https://github.com/joke2k/faker/issues/2311.
 
-        provider = Provider(self.generator)
-        for i in range(1000):
-            ssn = provider.ssn()
-            assert len(ssn) == 11
-            assert ssn[0] != "9"
-            assert ssn[0:3] != "666"
-            assert ssn[0:3] != "000"
-            assert ssn[4:6] != "00"
-            assert ssn[7:11] != "0000"
+        Passing ``includes`` to ``Factory.create()`` must not permanently
+        append to the module-level ``PROVIDERS`` list.
+        """
+        from faker.config import PROVIDERS
 
-    def test_nl_BE_ssn_valid(self):
-        fake = Faker("nl_BE")
-
-        for i in range(1000):
-            ssn = fake.ssn()
-            assert len(ssn) == 11
-            gen_seq = ssn[6:9]
-            gen_chksum = ssn[9:11]
-            gen_seq_as_int = int(gen_seq)
-            gen_chksum_as_int = int(gen_chksum)
-            # Check that the sequence nr is between 1 inclusive and 998 inclusive
-            assert gen_seq_as_int > 0
-            assert gen_seq_as_int <= 998
-
-            # validate checksum calculation
-            # Since the century is not part of ssn, try both below and above year 2000
-            ssn_below = int(ssn[0:9])
-            chksum_below = 97 - (ssn_below % 97)
-            ssn_above = ssn_below + 2000000000
-            chksum_above = 97 - (ssn_above % 97)
-            results = [chksum_above, chksum_below]
-            assert gen_chksum_as_int in results
+        original_length = len(PROVIDERS)
+        Factory.create(includes=["faker.providers.file"])
+        assert len(PROVIDERS) == original_length
 
     def test_instance_seed_chain(self):
         factory = Factory.create()

@@ -1,5 +1,6 @@
 from collections import OrderedDict
-from typing import Dict, Optional
+from functools import cached_property
+from typing import Dict, Optional, Tuple
 
 from ...typing import HueType
 from .. import BaseProvider, ElementsType
@@ -156,7 +157,7 @@ class Provider(BaseProvider):
         )
     )
 
-    safe_colors: ElementsType = (
+    safe_colors: ElementsType[str] = (
         "black",
         "maroon",
         "green",
@@ -175,28 +176,56 @@ class Provider(BaseProvider):
     )
 
     def color_name(self) -> str:
-        """Generate a color name."""
+        """
+        Generate a color name.
+
+        :sample:
+        """
         return self.random_element(self.all_colors.keys())
 
     def safe_color_name(self) -> str:
-        """Generate a web-safe color name."""
+        """
+        Generate a web-safe color name.
+
+        :sample:
+        """
         return self.random_element(self.safe_colors)
 
     def hex_color(self) -> str:
-        """Generate a color formatted as a hex triplet."""
+        """
+        Generate a color formatted as a hex triplet.
+
+        :sample:
+        """
         return f"#{self.random_int(1, 16777215):06x}"
 
     def safe_hex_color(self) -> str:
-        """Generate a web-safe color formatted as a hex triplet."""
+        """
+        Generate a web-safe color formatted as a hex triplet.
+
+        :sample:
+        """
         return f"#{self.random_int(0, 15) * 17:02x}{self.random_int(0, 15) * 17:02x}{self.random_int(0, 15) * 17:02x}"
 
     def rgb_color(self) -> str:
-        """Generate a color formatted as a comma-separated RGB value."""
+        """
+        Generate a color formatted as a comma-separated RGB value.
+
+        :sample:
+        """
         return ",".join(map(str, (self.random_int(0, 255) for _ in range(3))))
 
     def rgb_css_color(self) -> str:
-        """Generate a color formatted as a CSS rgb() function."""
+        """
+        Generate a color formatted as a CSS rgb() function.
+
+        :sample:
+        """
         return f"rgb({self.random_int(0, 255)},{self.random_int(0, 255)},{self.random_int(0, 255)})"
+
+    @cached_property
+    def _random_color(self):
+        return RandomColor(self.generator)
 
     def color(
         self,
@@ -238,8 +267,64 @@ class Provider(BaseProvider):
         :sample: hue=135, luminosity='dark', color_format='hsv'
         :sample: hue=(300, 20), luminosity='random', color_format='hsl'
         """
-        return RandomColor(self.generator).generate(
+        return self._random_color.generate(
             hue=hue,
             luminosity=luminosity,
             color_format=color_format,
         )
+
+    def color_rgb(
+        self,
+        hue: Optional[HueType] = None,
+        luminosity: Optional[str] = None,
+    ) -> Tuple[int, int, int]:
+        """
+        Generate a RGB color tuple of integers.
+
+        :sample:
+        :sample: hue='red', luminosity='dark'
+        :sample: hue=(100, 200), luminosity='random'
+        """
+        return self._random_color.generate_rgb(hue=hue, luminosity=luminosity)
+
+    def color_rgb_float(
+        self,
+        hue: Optional[HueType] = None,
+        luminosity: Optional[str] = None,
+    ) -> Tuple[float, float, float]:
+        """
+        Generate a RGB color tuple of floats.
+
+        :sample:
+        :sample: hue='red', luminosity='dark'
+        :sample: hue=(100, 200), luminosity='random'
+        """
+        return self._random_color.generate_rgb_float(hue=hue, luminosity=luminosity)
+
+    def color_hsl(
+        self,
+        hue: Optional[HueType] = None,
+        luminosity: Optional[str] = None,
+    ) -> Tuple[int, int, int]:
+        """
+        Generate a HSL color tuple.
+
+        :sample:
+        :sample: hue='red', luminosity='dark'
+        :sample: hue=(100, 200), luminosity='random'
+        """
+        return self._random_color.generate_hsl(hue=hue, luminosity=luminosity)
+
+    def color_hsv(
+        self,
+        hue: Optional[HueType] = None,
+        luminosity: Optional[str] = None,
+    ) -> Tuple[int, int, int]:
+        """
+        Generate a HSV color tuple.
+
+        :sample:
+        :sample: hue='red', luminosity='dark'
+        :sample: hue=(100, 200), luminosity='random'
+        """
+        return self._random_color.generate_hsv(hue=hue, luminosity=luminosity)

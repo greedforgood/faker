@@ -9,12 +9,47 @@ import pytest
 from faker.providers.color import RandomColor
 from faker.providers.color.az_AZ import Provider as AzAzColorProvider
 from faker.providers.color.bg_BG import Provider as BgBgColorProvider
+from faker.providers.color.cs_CZ import Provider as CsCzColorProvider
+from faker.providers.color.de_AT import Provider as DeAtColorProvider
+from faker.providers.color.de_CH import Provider as DeChColorProvider
+from faker.providers.color.de_DE import Provider as DeDeColorProvider
 from faker.providers.color.el_GR import Provider as ElGrColorProvider
 from faker.providers.color.es_ES import Provider as EsEsColorProvider
 from faker.providers.color.fa_IR import Provider as FaIrColorProvider
 from faker.providers.color.he_IL import Provider as HeILColorProvider
 from faker.providers.color.hy_AM import Provider as HyAmColorProvider
+from faker.providers.color.id_ID import Provider as IdIdColorProvider
+from faker.providers.color.ka_GE import Provider as KaGEColorProvider
+from faker.providers.color.mk_MK import Provider as MkMKColorProvider
 from faker.providers.color.sk_SK import Provider as SkSkColorProvider
+from faker.providers.color.uz_UZ import Provider as UzUzColorProvider
+from faker.providers.color.vi_VN import Provider as ViVNColorProvider
+
+
+class TestAzAz:
+    """Test az_AZ color provider methods"""
+
+    def test_color_name(self, faker, num_samples):
+        for _ in range(num_samples):
+            color_name = faker.color_name()
+            assert isinstance(color_name, str)
+            assert color_name in AzAzColorProvider.all_colors.keys()
+
+
+class TestBgBg:
+    """Test bg_BG color provider methods"""
+
+    def test_color_name(self, faker, num_samples):
+        for _ in range(num_samples):
+            color_name = faker.color_name()
+            assert isinstance(color_name, str)
+            assert color_name in BgBgColorProvider.all_colors.keys()
+
+    def test_safe_color_name(self, faker, num_samples):
+        for _ in range(num_samples):
+            safe_color_name = faker.safe_color_name()
+            assert isinstance(safe_color_name, str)
+            assert safe_color_name in BgBgColorProvider.safe_colors
 
 
 class TestColorProvider:
@@ -46,14 +81,210 @@ class TestColorProvider:
             assert 0 <= b <= 255
 
     def test_color(self, faker, num_samples):
-        baseline_random_color = RandomColor(seed=4761)
-        expected = [baseline_random_color.generate() for _ in range(num_samples)]
+        random_color = self._seed_instances(faker, 4761)
+        expected = [random_color.generate() for _ in range(num_samples)]
 
         # The `color` provider method should behave like the `generate`
         # method of a standalone RandomColor instance for a given seed
-        faker.seed_instance(4761)
         colors = [faker.color() for _ in range(num_samples)]
         assert colors == expected
+
+    def _seed_instances(self, faker, seed):
+        faker.seed_instance(seed)
+        return RandomColor(seed=seed)
+
+    def test_color_rgb(self, faker, num_samples):
+        random_color = self._seed_instances(faker, 4761)
+        expected = [random_color.generate_rgb() for _ in range(num_samples)]
+        colors = [faker.color_rgb() for _ in range(num_samples)]
+        assert colors == expected
+
+    def test_color_rgb_float(self, faker, num_samples):
+        random_color = self._seed_instances(faker, 4761)
+        expected = [random_color.generate_rgb_float() for _ in range(num_samples)]
+        colors = [faker.color_rgb_float() for _ in range(num_samples)]
+        assert colors == expected
+
+    def test_color_hsl(self, faker, num_samples):
+        random_color = self._seed_instances(faker, 4761)
+        expected = [random_color.generate_hsl() for _ in range(num_samples)]
+        colors = [faker.color_hsl() for _ in range(num_samples)]
+        assert colors == expected
+
+    def test_color_hsv(self, faker, num_samples):
+        random_color = self._seed_instances(faker, 4761)
+        expected = [random_color.generate_hsv() for _ in range(num_samples)]
+        colors = [faker.color_hsv() for _ in range(num_samples)]
+        assert colors == expected
+
+
+class TestCsCz:
+    """Test cs_CZ color provider methods"""
+
+    def test_safe_color_name(self, faker, num_samples):
+        for _ in range(num_samples):
+            safe_color_name = faker.safe_color_name()
+            assert isinstance(safe_color_name, str)
+            assert safe_color_name in CsCzColorProvider.safe_colors
+
+
+class TestDeAt:
+    """Test de_AT color provider methods"""
+
+    def test_color_name(self, faker, num_samples):
+        for _ in range(num_samples):
+            color_name = faker.color_name()
+            assert isinstance(color_name, str)
+            assert color_name in DeAtColorProvider.all_colors.keys()
+
+
+class TestDeCh:
+    """Test de_CH color provider methods"""
+
+    def test_color_name(self, faker, num_samples):
+        for _ in range(num_samples):
+            color_name = faker.color_name()
+            assert isinstance(color_name, str)
+            assert color_name in DeChColorProvider.all_colors.keys()
+            assert "ß" not in color_name
+
+
+class TestDeDe:
+    """Test de_DE color provider methods"""
+
+    def test_color_name(self, faker, num_samples):
+        for _ in range(num_samples):
+            color_name = faker.color_name()
+            assert isinstance(color_name, str)
+            assert color_name in DeDeColorProvider.all_colors.keys()
+
+
+class TestElGr:
+    """Test el_GR color provider methods"""
+
+    def test_color_name(self, faker, num_samples):
+        for _ in range(num_samples):
+            color_name = faker.color_name()
+            assert isinstance(color_name, str)
+            assert color_name in ElGrColorProvider.all_colors.keys()
+
+    def test_safe_color_name(self, faker, num_samples):
+        for _ in range(num_samples):
+            safe_color_name = faker.safe_color_name()
+            assert isinstance(safe_color_name, str)
+            assert safe_color_name in ElGrColorProvider.safe_colors
+
+
+class TestEsEs:
+    """Test es_ES color provider methods"""
+
+    def test_color_name(self, faker, num_samples):
+        for _ in range(num_samples):
+            color_name = faker.color_name()
+            assert isinstance(color_name, str)
+            assert color_name in EsEsColorProvider.all_colors.keys()
+
+    def test_safe_color_name(self, faker, num_samples):
+        for _ in range(num_samples):
+            safe_color_name = faker.safe_color_name()
+            assert isinstance(safe_color_name, str)
+            assert safe_color_name in EsEsColorProvider.safe_colors
+
+
+class TestFaIr:
+    """Test fa_IR color provider methods"""
+
+    def test_color_name(self, faker, num_samples):
+        for _ in range(num_samples):
+            color_name = faker.color_name()
+            assert isinstance(color_name, str)
+            assert color_name in FaIrColorProvider.all_colors.keys()
+
+    def test_safe_color_name(self, faker, num_samples):
+        for _ in range(num_samples):
+            safe_color_name = faker.safe_color_name()
+            assert isinstance(safe_color_name, str)
+            assert safe_color_name in FaIrColorProvider.safe_colors
+
+
+class TestHeIl:
+    """Test he_IL color provider methods"""
+
+    def test_color_name(self, faker, num_samples):
+        for _ in range(num_samples):
+            color_name = faker.color_name()
+            assert isinstance(color_name, str)
+            assert color_name in HeILColorProvider.all_colors.keys()
+
+    def test_safe_color_name(self, faker, num_samples):
+        for _ in range(num_samples):
+            safe_color_name = faker.safe_color_name()
+            assert isinstance(safe_color_name, str)
+            assert safe_color_name in HeILColorProvider.safe_colors
+
+
+class TestHyAm:
+    """Test hy_AM color provider methods"""
+
+    def test_color_name(self, faker, num_samples):
+        for _ in range(num_samples):
+            color_name = faker.color_name()
+            assert isinstance(color_name, str)
+            assert color_name in HyAmColorProvider.all_colors.keys()
+
+    def test_safe_color_name(self, faker, num_samples):
+        for _ in range(num_samples):
+            safe_color_name = faker.safe_color_name()
+            assert isinstance(safe_color_name, str)
+            assert safe_color_name in HyAmColorProvider.safe_colors
+
+
+class TestIdId:
+    """Test id_ID color provider methods"""
+
+    def test_color_name(self, faker, num_samples):
+        for _ in range(num_samples):
+            color_name = faker.color_name()
+            assert isinstance(color_name, str)
+            assert color_name in IdIdColorProvider.all_colors.keys()
+
+    def test_safe_color_name(self, faker, num_samples):
+        for _ in range(num_samples):
+            safe_color_name = faker.safe_color_name()
+            assert isinstance(safe_color_name, str)
+            assert safe_color_name in IdIdColorProvider.safe_colors
+
+
+class TestKaGe:
+    """Test Ka_GE color provider methods"""
+
+    def test_color_name(self, faker, num_samples):
+        for _ in range(num_samples):
+            color_name = faker.color_name()
+            assert isinstance(color_name, str)
+            assert color_name in KaGEColorProvider.all_colors.keys()
+
+    def test_safe_color_name(self, faker, num_samples):
+        for _ in range(num_samples):
+            safe_color_name = faker.safe_color_name()
+            assert isinstance(safe_color_name, str)
+            assert safe_color_name in KaGEColorProvider.safe_colors
+
+
+class TestMkMk:
+    """Test mk_MK color provider methods"""
+
+    def test_color_name(self, faker, num_samples):
+        for _ in range(num_samples):
+            color_name = faker.color_name()
+            assert isinstance(color_name, str)
+            assert color_name in MkMKColorProvider.all_colors.keys()
+
+    def test_safe_color_name(self, faker, num_samples):
+        for _ in range(num_samples):
+            safe_color_name = faker.safe_color_name()
+            assert isinstance(safe_color_name, str)
+            assert safe_color_name in MkMKColorProvider.safe_colors
 
 
 class TestRandomColor:
@@ -114,6 +345,42 @@ class TestRandomColor:
         for _ in range(num_samples):
             color = self.random_color.generate()
             assert self.hex_color_pattern.fullmatch(color)
+
+    def test_rgb(self, num_samples):
+        for _ in range(num_samples):
+            value = self.random_color.generate_rgb()
+            assert len(value) == 3
+            for i in range(3):
+                assert isinstance(value[i], int)
+                assert 0 <= value[i] <= 255
+
+    def test_rgb_float(self, num_samples):
+        for _ in range(num_samples):
+            value = self.random_color.generate_rgb_float()
+            assert len(value) == 3
+            for i in range(3):
+                assert isinstance(value[i], float)
+                assert 0 <= value[i] <= 1
+
+    def test_hsl(self, num_samples):
+        for _ in range(num_samples):
+            value = self.random_color.generate_hsl()
+            assert len(value) == 3
+            for i in range(3):
+                assert isinstance(value[i], int)
+            assert 0 <= value[0] <= 360
+            assert 0 <= value[1] <= 100
+            assert 0 <= value[2] <= 100
+
+    def test_hsv(self, num_samples):
+        for _ in range(num_samples):
+            value = self.random_color.generate_hsl()
+            assert len(value) == 3
+            for i in range(3):
+                assert isinstance(value[i], int)
+            assert 0 <= value[0] <= 360
+            assert 0 <= value[1] <= 100
+            assert 0 <= value[2] <= 100
 
     def test_hue_integer(self):
         # HSV format is used, because whatever hue value supplied must be present in the output
@@ -238,96 +505,6 @@ class TestRandomColor:
             self.random_color.generate(hue=62)
 
 
-class TestAzAz:
-    """Test az_AZ color provider methods"""
-
-    def test_color_name(self, faker, num_samples):
-        for _ in range(num_samples):
-            color_name = faker.color_name()
-            assert isinstance(color_name, str)
-            assert color_name in AzAzColorProvider.all_colors.keys()
-
-
-class TestHyAm:
-    """Test hy_AM color provider methods"""
-
-    def test_color_name(self, faker, num_samples):
-        for _ in range(num_samples):
-            color_name = faker.color_name()
-            assert isinstance(color_name, str)
-            assert color_name in HyAmColorProvider.all_colors.keys()
-
-    def test_safe_color_name(self, faker, num_samples):
-        for _ in range(num_samples):
-            safe_color_name = faker.safe_color_name()
-            assert isinstance(safe_color_name, str)
-            assert safe_color_name in HyAmColorProvider.safe_colors
-
-
-class TestFaIr:
-    """Test fa_IR color provider methods"""
-
-    def test_color_name(self, faker, num_samples):
-        for _ in range(num_samples):
-            color_name = faker.color_name()
-            assert isinstance(color_name, str)
-            assert color_name in FaIrColorProvider.all_colors.keys()
-
-    def test_safe_color_name(self, faker, num_samples):
-        for _ in range(num_samples):
-            safe_color_name = faker.safe_color_name()
-            assert isinstance(safe_color_name, str)
-            assert safe_color_name in FaIrColorProvider.safe_colors
-
-
-class TestBgBg:
-    """Test bg_BG color provider methods"""
-
-    def test_color_name(self, faker, num_samples):
-        for _ in range(num_samples):
-            color_name = faker.color_name()
-            assert isinstance(color_name, str)
-            assert color_name in BgBgColorProvider.all_colors.keys()
-
-    def test_safe_color_name(self, faker, num_samples):
-        for _ in range(num_samples):
-            safe_color_name = faker.safe_color_name()
-            assert isinstance(safe_color_name, str)
-            assert safe_color_name in BgBgColorProvider.safe_colors
-
-
-class TestElGr:
-    """Test el_GR color provider methods"""
-
-    def test_color_name(self, faker, num_samples):
-        for _ in range(num_samples):
-            color_name = faker.color_name()
-            assert isinstance(color_name, str)
-            assert color_name in ElGrColorProvider.all_colors.keys()
-
-    def test_safe_color_name(self, faker, num_samples):
-        for _ in range(num_samples):
-            safe_color_name = faker.safe_color_name()
-            assert isinstance(safe_color_name, str)
-            assert safe_color_name in ElGrColorProvider.safe_colors
-
-
-class TestEsEs:
-    """Test es_ES color provider methods"""
-
-    def test_color_name(self, faker, num_samples):
-        for _ in range(num_samples):
-            color_name = faker.color_name()
-            assert isinstance(color_name, str)
-            assert color_name in EsEsColorProvider.all_colors.keys()
-
-    def test_safe_color_name(self, faker, num_samples):
-        for _ in range(num_samples):
-            safe_color_name = faker.safe_color_name()
-            assert isinstance(safe_color_name, str)
-            assert safe_color_name in EsEsColorProvider.safe_colors
-
-
 class TestSkSk:
     """Test sk_SK color provider methods"""
 
@@ -338,17 +515,33 @@ class TestSkSk:
             assert safe_color_name in SkSkColorProvider.safe_colors
 
 
-class TestHeIl:
-    """Test he_IL color provider methods"""
+class TestUzUz:
+    """Test uz_UZ color provider methods"""
 
     def test_color_name(self, faker, num_samples):
         for _ in range(num_samples):
             color_name = faker.color_name()
             assert isinstance(color_name, str)
-            assert color_name in HeILColorProvider.all_colors.keys()
+            assert color_name in UzUzColorProvider.all_colors.keys()
 
     def test_safe_color_name(self, faker, num_samples):
         for _ in range(num_samples):
             safe_color_name = faker.safe_color_name()
             assert isinstance(safe_color_name, str)
-            assert safe_color_name in HeILColorProvider.safe_colors
+            assert safe_color_name in UzUzColorProvider.safe_colors
+
+
+class TestViVn:
+    """Test vi_VN color provider methods"""
+
+    def test_color_name(self, faker, num_samples):
+        for _ in range(num_samples):
+            color_name = faker.color_name()
+            assert isinstance(color_name, str)
+            assert color_name in ViVNColorProvider.all_colors.keys()
+
+    def test_safe_color_name(self, faker, num_samples):
+        for _ in range(num_samples):
+            safe_color_name = faker.safe_color_name()
+            assert isinstance(safe_color_name, str)
+            assert safe_color_name in ViVNColorProvider.safe_colors

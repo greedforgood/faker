@@ -12,31 +12,25 @@ class Provider(AddressProvider):
 
     Korea has two address and postal code system.
 
-    Address
-    -------
-
-    - Address based on land parcel numbers
-      (지번 주소, OLD, but someone use consistently)
-    - Address based on road names and building numbers (도로명 주소, NEW)
+    Address:
+        - Address based on land parcel numbers
+          (지번 주소, OLD, but someone use consistently)
+        - Address based on road names and building numbers (도로명 주소, NEW)
 
     :meth:`land_address` generate Address based on land parcel numbers and
     :meth:`road_address` generate Address based on road names and building
     numbers.
 
-    Postal code
-    -----------
-
-    - Old postal code (6-digit, OLD and dead)
-    - New postal code (5-digit, New)
+    Postal code:
+        - Old postal code (6-digit, OLD and dead)
+        - New postal code (5-digit, New)
 
     :meth:`old_postal_code` and :meth:`postcode` generate old 6-digit code
     and :meth:`postal_code` generate newer 5-digit code.
 
-    Reference
-    ---------
-
-    - `Official Confirmation Prividing that Old and New Addresses are Identical`__
-      (warn: cert error)
+    Reference:
+        - `Official Confirmation Prividing that Old and New Addresses are Identical`__
+          (warn: cert error)
 
     __ https://www.juso.go.kr/addridentity/AddrIdentityHelp.htm
 
@@ -66,10 +60,10 @@ class Provider(AddressProvider):
     )
     provinces = (
         "경기도",
-        "강원도",
+        "강원특별자치도",
         "충청북도",
         "충청남도",
-        "전라북도",
+        "전북특별자치도",
         "전라남도",
         "경상북도",
         "경상남도",
@@ -272,7 +266,7 @@ class Provider(AddressProvider):
         "리히텐슈타인",
         "마다가스카르",
         "마셜 제도",
-        "마케도니아 공화국",
+        "북마케도니아 공화국",
         "말라위",
         "말레이시아",
         "말리",
@@ -325,7 +319,7 @@ class Provider(AddressProvider):
         "수단",
         "수리남",
         "스리랑카",
-        "스와질란드",
+        "에스와티니",
         "스웨덴",
         "스위스",
         "스페인",
@@ -404,7 +398,7 @@ class Provider(AddressProvider):
         "타이",
         "타지키스탄",
         "탄자니아",
-        "터키",
+        "튀르키예",
         "토고",
         "통가",
         "투르크메니스탄",
@@ -460,8 +454,8 @@ class Provider(AddressProvider):
         "{{building_name}} {{building_dong}}동 ###호",
     )
     road_formats = (
-        "{{road_name}}{{road_suffix}}",
-        "{{road_name}}{{road_number}}{{road_suffix}}",
+        "{{road_name}}{{road_suffix}} {{building_number}}",
+        "{{road_name}}{{road_number}}{{road_suffix}} {{building_number}}",
     )
     road_address_formats = (
         "{{metropolitan_city}} {{borough}} {{road}}",
@@ -483,65 +477,103 @@ class Provider(AddressProvider):
 
     def land_number(self) -> str:
         """
-        :example 507
+        :example: 507
         """
         return self.bothify(self.random_element(self.land_numbers))
 
     def land_address(self) -> str:
         """
-        :example 세종특별자치시 어진동 507
+        :example: 세종특별자치시 어진동 507
         """
         pattern: str = self.random_element(self.land_address_formats)
         return self.generator.parse(pattern)
 
     def road_number(self) -> str:
         """
-        :example 24
+        :example: 24
         """
         return self.bothify(self.random_element(self.road_numbers))
 
     def road_address(self) -> str:
         """
-        :example 세종특별자치시 도움5로 19 (어진동)
+        :example: 세종특별자치시 도움5로 19 (어진동)
         """
         pattern: str = self.random_element(self.road_address_formats)
         return self.generator.parse(pattern)
 
     def address_detail(self) -> str:
         """
-        :example 가나아파트 가동 102호
+        :example: 가나아파트 가동 102호
         """
         pattern: str = self.bothify(self.random_element(self.address_detail_formats))
         return self.generator.parse(pattern)
 
     def road(self) -> str:
         """
-        :example 도움5로
+        :example: 도움5로
         """
         pattern: str = self.random_element(self.road_formats)
         return self.generator.parse(pattern)
 
     def road_name(self) -> str:
         """
-        :example 압구정
+        :example: 압구정
         """
         return self.random_element(self.road_names)
 
     def road_suffix(self) -> str:
         """
-        :example 길
+        :example: 길
         """
         return self.random_element(self.road_suffixes)
 
+    def building_number(self) -> str:
+        """
+        :returns: A random building number
+
+        Generates building number(건물 번호). There are 3 types of building number with current ROK addressing system.
+            (1) 19: A typical format. Only marks one building.
+            (2) 지하11: The building entrance is underground.
+            (3) 132-1: Several buildings are distinguished with sub-building-number(가지 번호).
+
+        Generating probability is arbitrarily.
+
+        :example: 19, 지하11, 143-1
+        """
+        if self.random_int() % 9 < 1:
+            return self.building_number_underground()
+        elif self.random_int() % 9 < 4:
+            return self.building_number_segregated()
+        else:
+            return "%d" % self.generator.random.randint(1, 999)
+
+    def building_number_underground(self) -> str:
+        """
+        :returns: A random building number with undergrond entrances
+
+        :example: 지하11
+        """
+        return "지하%d" % (self.generator.random.randint(1, 999))
+
+    def building_number_segregated(self) -> str:
+        """
+        :returns: A random building number distinguished with sub-building-number(가지 번호)
+
+        :example: 143-1
+        """
+        main_building_number = self.generator.random.randint(1, 999)
+        sub_building_number = self.generator.random.randint(1, 99)
+        return "%d-%d" % (main_building_number, sub_building_number)
+
     def metropolitan_city(self) -> str:
         """
-        :example 서울특별시
+        :example: 서울특별시
         """
         return self.random_element(self.metropolitan_cities)
 
     def administrative_unit(self) -> str:
         """
-        :example 경기도
+        :example: 경기도
         """
         return self.random_element(self.provinces)
 
@@ -549,63 +581,63 @@ class Provider(AddressProvider):
 
     def city(self) -> str:
         """
-        :example 고양시
+        :example: 고양시
         """
         pattern: str = self.random_element(self.cities)
         return self.generator.parse(pattern)
 
     def borough(self) -> str:
         """
-        :example 중구
+        :example: 중구
         """
         return self.random_element(self.boroughs)
 
     def town(self) -> str:
         """
-        :example 가나동
+        :example: 가나동
         """
         pattern: str = self.random_element(self.town_formats)
         return self.generator.parse(pattern)
 
     def town_suffix(self) -> str:
         """
-        :example 동
+        :example: 동
         """
         return self.random_element(self.town_suffixes)
 
     def building_name(self) -> str:
         """
-        :example 김구아파트
+        :example: 김구아파트
         """
         pattern: str = self.random_element(self.building_name_formats)
         return self.generator.parse(pattern)
 
     def building_suffix(self) -> str:
         """
-        :example 아파트
+        :example: 아파트
         """
         return self.random_element(self.building_suffixes)
 
     def building_dong(self) -> str:
         """
-        :example 가
+        :example: 가
         """
         return self.bothify(self.random_element(self.building_dongs))
 
     def old_postal_code(self) -> str:
         """
-        :example 123-456
+        :example: 123-456
         """
         return self.bothify(self.random_element(self.postcode_formats))
 
     def postcode(self) -> str:
         """
-        :example 12345
+        :example: 12345
         """
         return self.bothify(self.random_element(self.new_postal_code_formats))
 
     def postal_code(self) -> str:
         """
-        :example 12345
+        :example: 12345
         """
         return self.postcode()

@@ -13,14 +13,169 @@ from validators import email as validate_email
 from faker.providers.internet import Provider as InternetProvider
 from faker.providers.internet.az_AZ import Provider as AzAzInternetProvider
 from faker.providers.internet.en_GB import Provider as EnGbInternetProvider
+from faker.providers.internet.es_CO import Provider as EsCoInternetProvider
 from faker.providers.internet.es_ES import Provider as EsEsInternetProvider
+from faker.providers.internet.hu_HU import Provider as HuHuInternetProvider
+from faker.providers.internet.mk_MK import Provider as MkMKInternetProvider
 from faker.providers.internet.pl_PL import Provider as PlPlInternetProvider
+from faker.providers.internet.pt_BR import Provider as PtBrInternetProvider
 from faker.providers.internet.ro_RO import Provider as RoRoInternetProvider
 from faker.providers.internet.ru_RU import Provider as RuRuInternetProvider
 from faker.providers.internet.th_TH import Provider as ThThInternetProvider
 from faker.providers.internet.zh_CN import Provider as ZhCnInternetProvider
 from faker.providers.person.ja_JP import Provider as JaPersonProvider
 from faker.utils import text
+
+
+class TestArAa:
+    """Test ar_AA internet provider methods"""
+
+    @patch(
+        "faker.providers.internet.Provider.user_name",
+        lambda x: "اصيل",
+    )
+    def test_ascii_safe_email(self, faker):
+        email = faker.ascii_safe_email()
+        validate_email(email)
+        assert email.split("@")[0] == "asyl"
+
+    @patch(
+        "faker.providers.internet.Provider.user_name",
+        lambda x: "اصيل",
+    )
+    def test_ascii_free_email(self, faker):
+        email = faker.ascii_free_email()
+        validate_email(email)
+        assert email.split("@")[0] == "asyl"
+
+    @patch(
+        "faker.providers.internet.Provider.user_name",
+        lambda x: "اصيل",
+    )
+    def test_ascii_company_email(self, faker):
+        email = faker.ascii_company_email()
+        validate_email(email)
+        assert email.split("@")[0] == "asyl"
+
+    def test_slug(self, faker):
+        num_of_samples = 100
+        for _ in range(num_of_samples):
+            assert faker.slug() != ""
+
+
+class TestAzAz:
+    """Test az_AZ internet provider methods"""
+
+    @patch(
+        "faker.providers.internet.Provider.user_name",
+        lambda x: "AğamüşviqƏlövsətov",
+    )
+    def test_ascii_free_email(self, faker):
+        email = faker.ascii_free_email()
+        validate_email(email)
+        assert email.split("@")[0] == "agamushviqelovsetov"
+
+    def test_free_email_domain(self, faker):
+        domain = faker.free_email_domain()
+        assert domain in AzAzInternetProvider.free_email_domains
+
+    def test_tld(self, faker):
+        tld = faker.tld()
+        assert tld in AzAzInternetProvider.tlds
+
+    def test_slug(self, faker):
+        num_of_samples = 100
+        for _ in range(num_of_samples):
+            assert faker.slug() != ""
+
+
+class TestEnGb:
+    """Tests for the en_GB locale."""
+
+    def test_free_email_domain(self, faker):
+        domain = faker.free_email_domain()
+        assert domain in EnGbInternetProvider.free_email_domains
+
+    def test_tld(self, faker):
+        tld = faker.tld()
+        assert tld in EnGbInternetProvider.tlds
+
+    def test_slug(self, faker):
+        num_of_samples = 100
+        for _ in range(num_of_samples):
+            assert faker.slug() != ""
+
+
+class TestEnPh:
+    """Test en_PH internet provider methods"""
+
+    num_samples = 100
+
+    def test_domain_name(self, faker, num_samples):
+        for i in range(num_samples):
+            domain = faker.domain_name()
+            validate_domain(domain)
+
+    def test_slug(self, faker):
+        num_of_samples = 100
+        for _ in range(num_of_samples):
+            assert faker.slug() != ""
+
+
+class TestEsCo:
+    """Tests for the es_CO locale."""
+
+    def test_tld(self, faker):
+        tld = faker.tld()
+        assert tld in EsCoInternetProvider.tlds
+
+
+class TestEsEs:
+    """Tests for the es_ES locale."""
+
+    def test_tld(self, faker):
+        tld = faker.tld()
+        assert tld in EsEsInternetProvider.tlds
+
+    def test_slug(self, faker):
+        num_of_samples = 100
+        for _ in range(num_of_samples):
+            assert faker.slug() != ""
+
+
+class TestFilPh(TestEnPh):
+    """Test fil_PH internet provider methods"""
+
+    def test_slug(self, faker):
+        num_of_samples = 100
+        for _ in range(num_of_samples):
+            assert faker.slug() != ""
+
+
+class TestHuHu:
+    """Test hu_HU internet provider methods"""
+
+    def test_internet(self, faker):
+        free_email_domain = faker.free_email_domain()
+        assert free_email_domain in HuHuInternetProvider.free_email_domains
+        tld = faker.tld()
+        assert tld in HuHuInternetProvider.tlds
+        email = faker.free_email()
+        assert email.split("@")[1] in HuHuInternetProvider.free_email_domains
+
+    # fun fact: these two words contain all hungarian accented letters.
+    # "Winnie-the-pooh's mirror drill"
+    @patch(
+        "faker.providers.internet.Provider.user_name",
+        lambda x: "micimackó.tükörfúrógépe",
+    )
+    def test_ascii_free_email_accented_character_replacements(self, faker):
+        email = faker.ascii_free_email()
+        validate_email(email)
+        assert email.split("@")[0] == "micimacko.tukorfurogepe"
+
+    def test_slug_accented_character_replacements(self, faker):
+        assert faker.slug("micimackó.tükörfúrógépe") == "micimackotukorfurogepe"
 
 
 class TestInternetProvider:
@@ -137,7 +292,10 @@ class TestInternetProvider:
 
             # Then, test cache access on subsequent calls
             with patch.object(
-                InternetProvider, networks_attr, create=True, new_callable=PropertyMock
+                InternetProvider,
+                networks_attr,
+                create=True,
+                new_callable=PropertyMock,
             ) as mock_networks_cache:
                 with patch.object(
                     InternetProvider,
@@ -206,7 +364,10 @@ class TestInternetProvider:
 
             # Then, test cache access on subsequent calls
             with patch.object(
-                InternetProvider, networks_attr, create=True, new_callable=PropertyMock
+                InternetProvider,
+                networks_attr,
+                create=True,
+                new_callable=PropertyMock,
             ) as mock_networks_cache:
                 with patch.object(
                     InternetProvider,
@@ -271,7 +432,10 @@ class TestInternetProvider:
             11,  # Not a list or valid iterable
         ]
 
-        with patch("faker.providers.internet.choices_distribution", wraps=choices_distribution) as mock_choices_fn:
+        with patch(
+            "faker.providers.internet.choices_distribution",
+            wraps=choices_distribution,
+        ) as mock_choices_fn:
             with patch("faker.generator.random.choice", wraps=random.choice) as mock_random_choice:
                 # If weights argument is valid, only `choices_distribution` should be called
                 provider._random_ipv4_address_from_subnets(subnets, valid_weights)
@@ -304,6 +468,15 @@ class TestInternetProvider:
             assert len(address) <= 39 + 4
             assert re.compile(r"^([0-9a-f]{0,4}:){2,7}[0-9a-f]{0,4}/\d{1,3}$").search(address)
 
+    def test_mac_address(self, faker):
+        provider = InternetProvider(faker)
+
+        unicast_address = provider.mac_address()
+        assert int(unicast_address[0:2], base=16) % 2 == 0
+
+        multicast_address = provider.mac_address(multicast=True)
+        assert int(multicast_address[0:2], base=16) % 2 == 1
+
     def test_port_number(self, faker, num_samples):
         for _ in range(num_samples):
             assert 0 <= faker.port_number() <= 65535
@@ -329,6 +502,16 @@ class TestInternetProvider:
             got_methods.add(faker.http_method())
 
         assert expected_methods == sorted(got_methods)
+
+    def test_http_status_code(self, faker, num_samples):
+        provider = InternetProvider(faker)
+        status_code = provider.http_status_code()
+        assert isinstance(status_code, int)
+        assert 100 <= status_code <= 599
+        status_code = provider.http_status_code(include_unassigned=False)
+        assert isinstance(status_code, int)
+        assert 100 <= status_code <= 599
+        assert status_code in InternetProvider.http_assigned_codes
 
     def test_dga(self, faker):
         assert faker.dga() != faker.dga()
@@ -359,6 +542,50 @@ class TestInternetProvider:
 
         with pytest.raises(ValueError):
             faker.nic_handles(suffix="")
+
+
+class TestInternetProviderUri:
+    """Test internet uri generation"""
+
+    @staticmethod
+    def is_correct_scheme(uri, schemes):
+        return any(uri.startswith(f"{scheme}://") for scheme in schemes)
+
+    def test_uri_default_schemes(self, faker):
+        for _ in range(100):
+            uri = faker.uri()
+            assert self.is_correct_scheme(uri, ["http", "https"])
+
+    def test_uri_custom_schemes(self, faker):
+        schemes_sets = [
+            ["usb"],
+            ["ftp", "file"],
+            ["usb", "telnet", "http"],
+        ]
+        for _, schemes in zip(range(100), cycle(schemes_sets)):
+            uri = faker.uri(schemes=schemes)
+            assert self.is_correct_scheme(uri, schemes)
+
+    def test_uri_empty_schemes_list_generate_schemeless_urls(self, faker):
+        for _ in range(100):
+            uri = faker.uri(schemes=[])
+            assert not uri.startswith("http")
+            assert uri.startswith("://")
+
+    def test_uri_extension(self, faker):
+        uri = faker.uri()
+        assert "." in uri
+
+    def test_uri_component(self, faker):
+        uri = faker.uri()
+        assert "/" in uri
+
+    def test_uri_deep(self, faker):
+        uri = faker.uri(deep=1).replace("://", "")
+        assert uri.count("/") == 1
+
+        uri = faker.uri(deep=3).replace("://", "")
+        assert uri.count("/") == 3
 
 
 class TestInternetProviderUrl:
@@ -413,6 +640,193 @@ class TestJaJp:
 
         tld = faker.tld()
         assert isinstance(tld, str)
+
+    def test_slug(self, faker):
+        num_of_samples = 100
+        for _ in range(num_of_samples):
+            assert faker.slug() != ""
+
+
+class TestNlNl:
+    """Test nl_NL internet provider methods"""
+
+    @patch(
+        "faker.providers.internet.Provider.user_name",
+        lambda x: "fabiënné",
+    )
+    def test_ascii_safe_email(self, faker):
+        email = faker.ascii_safe_email()
+        validate_email(email)
+        assert email.split("@")[0] == "fabienne"
+
+    @patch(
+        "faker.providers.internet.Provider.user_name",
+        lambda x: "fabiënné",
+    )
+    def test_ascii_free_email(self, faker):
+        email = faker.ascii_free_email()
+        validate_email(email)
+        assert email.split("@")[0] == "fabienne"
+
+    @patch(
+        "faker.providers.internet.Provider.user_name",
+        lambda x: "fabiënné",
+    )
+    def test_ascii_company_email(self, faker):
+        email = faker.ascii_company_email()
+        validate_email(email)
+        assert email.split("@")[0] == "fabienne"
+
+    def test_slug(self, faker):
+        num_of_samples = 100
+        for _ in range(num_of_samples):
+            assert faker.slug() != ""
+
+
+class TestPlPl:
+    """Test pl_PL internet provider methods"""
+
+    def test_free_email_domain(self, faker):
+        domain = faker.free_email_domain()
+        assert domain in PlPlInternetProvider.free_email_domains
+
+    def test_tld(self, faker):
+        tld = faker.tld()
+        assert tld in PlPlInternetProvider.tlds
+
+    def test_slug(self, faker):
+        num_of_samples = 100
+        for _ in range(num_of_samples):
+            assert faker.slug() != ""
+
+
+class TestPtBr:
+    """Test pt_BR internet provider methods"""
+
+    def test_free_email_domain(self, faker):
+        domain = faker.free_email_domain()
+        assert domain in PtBrInternetProvider.free_email_domains
+
+    def test_tld(self, faker):
+        tld = faker.tld()
+        assert tld in PtBrInternetProvider.tlds
+        assert not tld.startswith(".")
+
+    @patch(
+        "faker.providers.internet.Provider.user_name",
+        lambda x: "VitóriaMagalhães",
+    )
+    def test_ascii_safe_email_existing(self, faker):
+        """It retains the original test to ensure backward compatibility."""
+        email = faker.ascii_safe_email()
+        validate_email(email)
+        assert email.split("@")[0] == "vitoriamagalhaes"
+
+    @patch(
+        "faker.providers.internet.Provider.user_name",
+        lambda x: "JoãoVovóMônica",
+    )
+    def test_ascii_email_new_replacements(self, faker):
+        """Test the new characters you added (ó, ô, ã)"""
+        email = faker.ascii_free_email()
+        # João -> joao, Vovó -> vovo, Mônica -> monica
+        expected_slug = "joaovovomonica"
+        assert expected_slug in email
+
+    def test_slug(self, faker):
+        num_of_samples = 100
+        for _ in range(num_of_samples):
+            assert faker.slug() != ""
+
+    def test_new_domains_are_present(self, faker):
+        """It statistically verifies if new domains appear."""
+
+        domains = [faker.free_email_domain() for _ in range(500)]
+
+        assert "outlook.com.br" in domains
+        assert "icloud.com" in domains
+        assert "uol.com.br" in domains
+
+
+class TestRoRo:
+    """Test ro_RO internet provider methods"""
+
+    def test_free_email_domain(self, faker):
+        domain = faker.free_email_domain()
+        assert domain in RoRoInternetProvider.free_email_domains
+
+    def test_tld(self, faker):
+        tld = faker.tld()
+        assert tld in PlPlInternetProvider.tlds
+
+    def test_slug(self, faker):
+        num_of_samples = 100
+        for _ in range(num_of_samples):
+            assert faker.slug() != ""
+
+
+class TestRuRu:
+    """Test ru_RU internet provider methods"""
+
+    def test_free_email_domain(self, faker):
+        assert faker.free_email_domain() in RuRuInternetProvider.free_email_domains
+
+    def test_tld(self, faker):
+        assert faker.tld() in RuRuInternetProvider.tlds
+
+    @patch(
+        "faker.providers.internet.Provider.user_name",
+        lambda x: "ИванИванов",
+    )
+    def test_ascii_safe_email(self, faker):
+        email = faker.ascii_safe_email()
+        validate_email(email)
+        assert email.split("@")[0] == "ivanivanov"
+
+    @patch(
+        "faker.providers.internet.Provider.user_name",
+        lambda x: "АлександрСмирнов",
+    )
+    def test_ascii_free_email(self, faker):
+        email = faker.ascii_free_email()
+        validate_email(email)
+        assert email.split("@")[0] == "aleksandrsmirnov"
+
+    @patch(
+        "faker.providers.internet.Provider.user_name",
+        lambda x: "СергейКузнецов",
+    )
+    def test_ascii_company_email(self, faker):
+        email = faker.ascii_company_email()
+        validate_email(email)
+        assert email.split("@")[0] == "sergekuznetsov"
+
+    def test_slug(self, faker):
+        num_of_samples = 100
+        for _ in range(num_of_samples):
+            assert faker.slug() != ""
+
+
+class TestThTh:
+    """Test th_TH internet provider methods"""
+
+    def test_tld(self, faker):
+        tld = faker.tld()
+        assert tld in ThThInternetProvider.tlds
+
+    def test_slug(self, faker):
+        num_of_samples = 100
+        for _ in range(num_of_samples):
+            assert faker.slug() != ""
+
+
+class TestTlPh(TestFilPh):
+    """Test tl_PH internet provider methods"""
+
+    def test_slug(self, faker):
+        num_of_samples = 100
+        for _ in range(num_of_samples):
+            assert faker.slug() != ""
 
 
 class TestZhCn:
@@ -584,6 +998,11 @@ class TestZhCn:
         with pytest.raises(ValueError):
             faker.domain_name(levels=0)
 
+    def test_slug(self, faker):
+        num_of_samples = 100
+        for _ in range(num_of_samples):
+            assert faker.slug() != ""
+
 
 class TestZhTw:
     """Test zh_TW internet provider methods"""
@@ -592,240 +1011,27 @@ class TestZhTw:
         email = faker.email()
         validate_email(email)
 
-
-class TestHuHu:
-    """Test hu_HU internet provider methods"""
-
-    def test_internet(self, faker):
-        domain_name = faker.domain_name()
-        assert isinstance(domain_name, str)
-        tld = faker.tld()
-        assert isinstance(tld, str)
-        email = faker.email()
-        assert isinstance(email, str)
+    def test_slug(self, faker):
+        num_of_samples = 100
+        for _ in range(num_of_samples):
+            assert faker.slug() != ""
 
 
-class TestPlPl:
-    """Test pl_PL internet provider methods"""
+class TestMkMk:
+    """Test mk_MK internet provider methods"""
 
-    def test_free_email_domain(self, faker):
-        domain = faker.free_email_domain()
-        assert domain in PlPlInternetProvider.free_email_domains
+    def test_free_email_domain(self, faker, num_samples):
+        for _ in range(num_samples):
+            domain = faker.free_email_domain()
+            assert domain in MkMKInternetProvider.free_email_domains
 
-    def test_tld(self, faker):
-        tld = faker.tld()
-        assert tld in PlPlInternetProvider.tlds
+    def test_tld(self, faker, num_samples):
+        for _ in range(num_samples):
+            tld = faker.tld()
+            assert tld in MkMKInternetProvider.tlds
 
-
-class TestNlNl:
-    """Test nl_NL internet provider methods"""
-
-    @patch(
-        "faker.providers.internet.Provider.user_name",
-        lambda x: "fabiënné",
-    )
-    def test_ascii_safe_email(self, faker):
-        email = faker.ascii_safe_email()
-        validate_email(email)
-        assert email.split("@")[0] == "fabienne"
-
-    @patch(
-        "faker.providers.internet.Provider.user_name",
-        lambda x: "fabiënné",
-    )
-    def test_ascii_free_email(self, faker):
-        email = faker.ascii_free_email()
-        validate_email(email)
-        assert email.split("@")[0] == "fabienne"
-
-    @patch(
-        "faker.providers.internet.Provider.user_name",
-        lambda x: "fabiënné",
-    )
-    def test_ascii_company_email(self, faker):
-        email = faker.ascii_company_email()
-        validate_email(email)
-        assert email.split("@")[0] == "fabienne"
-
-
-class TestArAa:
-    """Test ar_AA internet provider methods"""
-
-    @patch(
-        "faker.providers.internet.Provider.user_name",
-        lambda x: "اصيل",
-    )
-    def test_ascii_safe_email(self, faker):
-        email = faker.ascii_safe_email()
-        validate_email(email)
-        assert email.split("@")[0] == "asyl"
-
-    @patch(
-        "faker.providers.internet.Provider.user_name",
-        lambda x: "اصيل",
-    )
-    def test_ascii_free_email(self, faker):
-        email = faker.ascii_free_email()
-        validate_email(email)
-        assert email.split("@")[0] == "asyl"
-
-    @patch(
-        "faker.providers.internet.Provider.user_name",
-        lambda x: "اصيل",
-    )
-    def test_ascii_company_email(self, faker):
-        email = faker.ascii_company_email()
-        validate_email(email)
-        assert email.split("@")[0] == "asyl"
-
-
-class TestAzAz:
-    """Test az_AZ internet provider methods"""
-
-    @patch(
-        "faker.providers.internet.Provider.user_name",
-        lambda x: "AğamüşviqƏlövsətov",
-    )
-    def test_ascii_free_email(self, faker):
-        email = faker.ascii_free_email()
-        validate_email(email)
-        assert email.split("@")[0] == "agamushviqelovsetov"
-
-    def test_free_email_domain(self, faker):
-        domain = faker.free_email_domain()
-        assert domain in AzAzInternetProvider.free_email_domains
-
-    def test_tld(self, faker):
-        tld = faker.tld()
-        assert tld in AzAzInternetProvider.tlds
-
-
-class TestPtBr:
-    """Test pt_BR internet provider methods"""
-
-    @patch(
-        "faker.providers.internet.Provider.user_name",
-        lambda x: "VitóriaMagalhães",
-    )
-    def test_ascii_safe_email(self, faker):
-        email = faker.ascii_safe_email()
-        validate_email(email)
-        assert email.split("@")[0] == "vitoriamagalhaes"
-
-    @patch(
-        "faker.providers.internet.Provider.user_name",
-        lambda x: "JoãoSimões",
-    )
-    def test_ascii_free_email(self, faker):
-        email = faker.ascii_free_email()
-        validate_email(email)
-        assert email.split("@")[0] == "joaosimoes"
-
-    @patch(
-        "faker.providers.internet.Provider.user_name",
-        lambda x: "AndréCauã",
-    )
-    def test_ascii_company_email(self, faker):
-        email = faker.ascii_company_email()
-        validate_email(email)
-        assert email.split("@")[0] == "andrecaua"
-
-
-class TestEnPh:
-    """Test en_PH internet provider methods"""
-
-    num_samples = 100
-
-    def test_domain_name(self, faker, num_samples):
-        for i in range(num_samples):
-            domain = faker.domain_name()
-            validate_domain(domain)
-
-
-class TestFilPh(TestEnPh):
-    """Test fil_PH internet provider methods"""
-
-    pass
-
-
-class TestTlPh(TestFilPh):
-    """Test tl_PH internet provider methods"""
-
-    pass
-
-
-class TestEnGb:
-    """Tests for the en_GB locale."""
-
-    def test_free_email_domain(self, faker):
-        domain = faker.free_email_domain()
-        assert domain in EnGbInternetProvider.free_email_domains
-
-    def test_tld(self, faker):
-        tld = faker.tld()
-        assert tld in EnGbInternetProvider.tlds
-
-
-class TestEsEs:
-    """Tests for the es_ES locale."""
-
-    def test_tld(self, faker):
-        tld = faker.tld()
-        assert tld in EsEsInternetProvider.tlds
-
-
-class TestRoRo:
-    """Test ro_RO internet provider methods"""
-
-    def test_free_email_domain(self, faker):
-        domain = faker.free_email_domain()
-        assert domain in RoRoInternetProvider.free_email_domains
-
-    def test_tld(self, faker):
-        tld = faker.tld()
-        assert tld in PlPlInternetProvider.tlds
-
-
-class TestRuRu:
-    """Test ru_RU internet provider methods"""
-
-    def test_free_email_domain(self, faker):
-        assert faker.free_email_domain() in RuRuInternetProvider.free_email_domains
-
-    def test_tld(self, faker):
-        assert faker.tld() in RuRuInternetProvider.tlds
-
-    @patch(
-        "faker.providers.internet.Provider.user_name",
-        lambda x: "ИванИванов",
-    )
-    def test_ascii_safe_email(self, faker):
-        email = faker.ascii_safe_email()
-        validate_email(email)
-        assert email.split("@")[0] == "ivanivanov"
-
-    @patch(
-        "faker.providers.internet.Provider.user_name",
-        lambda x: "АлександрСмирнов",
-    )
-    def test_ascii_free_email(self, faker):
-        email = faker.ascii_free_email()
-        validate_email(email)
-        assert email.split("@")[0] == "aleksandrsmirnov"
-
-    @patch(
-        "faker.providers.internet.Provider.user_name",
-        lambda x: "СергейКузнецов",
-    )
-    def test_ascii_company_email(self, faker):
-        email = faker.ascii_company_email()
-        validate_email(email)
-        assert email.split("@")[0] == "sergekuznetsov"
-
-
-class TestThTh:
-    """Test th_TH internet provider methods"""
-
-    def test_tld(self, faker):
-        tld = faker.tld()
-        assert tld in ThThInternetProvider.tlds
+    def test_email(self, faker, num_samples):
+        for _ in range(num_samples):
+            email = faker.email()
+            assert isinstance(email, str)
+            assert "@" in email

@@ -11,6 +11,7 @@ class Provider(BankProvider):
     - http://cbr.ru/credit/coreports/ko17012020.zip
     """
 
+    bban_format = "##############???????????????"
     country_code = "RU"
 
     region_codes = (
@@ -753,7 +754,3 @@ class Provider(BankProvider):
         organization: str = self.random_element(self.organization_codes)
         currency: str = self.random_element(self.currency_codes)
         return account + organization + currency + self.numerify("#" * 12)
-
-    def bank(self) -> str:
-        """Generate a bank name."""
-        return self.random_element(self.banks)

@@ -2,7 +2,6 @@ from .. import Provider as CompanyProvider
 
 
 class Provider(CompanyProvider):
-
     formats = (
         "{{last_name}} {{company_suffix}}",
         "{{last_name}} & {{last_name}}",
@@ -517,6 +516,6 @@ class Provider(CompanyProvider):
 
     def company_prefix(self) -> str:
         """
-        :example 'Stichting'
+        :example: 'Stichting'
         """
         return self.random_element(self.company_prefixes)

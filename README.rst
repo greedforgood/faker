@@ -23,7 +23,7 @@ Compatibility
 -------------
 
 Starting from version ``4.0.0``, ``Faker`` dropped support for Python 2 and from version ``5.0.0``
-only supports Python 3.6 and above. If you still need Python 2 compatibility, please install version ``3.0.1`` in the
+only supports Python 3.8 and above. If you still need Python 2 compatibility, please install version ``3.0.1`` in the
 meantime, and please consider updating your codebase to support Python 3 so you can enjoy the
 latest features ``Faker`` has to offer. Please see the `extended docs`_ for more details, especially
 if you are upgrading from version ``2.0.4`` and below as there might be breaking changes.
@@ -184,7 +184,7 @@ When installed, you can invoke faker from the command-line:
     faker [-h] [--version] [-o output]
           [-l {bg_BG,cs_CZ,...,zh_CN,zh_TW}]
           [-r REPEAT] [-s SEP]
-          [-i {package.containing.custom_provider otherpkg.containing.custom_provider}]
+          [-i package.containing.custom_provider]
           [fake] [fake argument [fake argument ...]]
 
 Where:
@@ -206,9 +206,9 @@ Where:
 -  ``-s SEP``: will generate the specified separator after each
    generated output
 
--  ``-i {my.custom_provider other.custom_provider}`` list of additional custom
-   providers to use. Note that is the import path of the package containing
-   your Provider class, not the custom Provider class itself.
+-  ``-i package.containing.custom_provider`` additional custom provider to use. Note this
+   is the import path of the package containing your Provider class, not the
+   custom Provider class itself. Can be repeated to add multiple providers.
 
 -  ``fake``: is the name of the fake to generate an output for, such as
    ``name``, ``address``, or ``text``
@@ -236,6 +236,11 @@ Examples:
     Willam Kertzmann;
     Josiah Maggio;
     Gayla Schmitt;
+
+    $ faker -i faker_credit_score credit_score_full
+    Experian/Fair Isaac Risk Model V2SM
+    Experian
+    801
 
 How to create a Provider
 ------------------------
@@ -357,7 +362,18 @@ that any generated values are unique for this specific instance.
    names = [fake.unique.first_name() for i in range(500)]
    assert len(set(names)) == len(names)
 
+On ``Faker`` instances with multiple locales, you can specify the locale to use
+for the unique values by using the subscript notation:
+
+.. code:: python
+
+   from faker import Faker
+   fake = Faker(['en_US', 'fr_FR'])
+   names = [fake.unique["en_US"].first_name() for i in range(500)]
+   assert len(set(names)) == len(names)
+
 Calling ``fake.unique.clear()`` clears the already seen values.
+
 Note, to avoid infinite loops, after a number of attempts to find a unique
 value, Faker will throw a ``UniquenessException``. Beware of the `birthday
 paradox <https://en.wikipedia.org/wiki/Birthday_problem>`_, collisions
@@ -380,9 +396,9 @@ Seeding the Generator
 ---------------------
 
 When using Faker for unit testing, you will often want to generate the same
-data set. For convenience, the generator also provide a ``seed()`` method,
-which seeds the shared random number generator. Calling the same methods with
-the same version of faker and seed produces the same results.
+data set. For convenience, the generator also provides a ``seed()`` method,
+which seeds the shared random number generator. A Seed produces the same result
+when the same methods with the same version of faker are called.
 
 .. code:: python
 
@@ -393,8 +409,8 @@ the same version of faker and seed produces the same results.
     print(fake.name())
     # 'Margaret Boehm'
 
-Each generator can also be switched to its own instance of ``random.Random``,
-separate to the shared one, by using the ``seed_instance()`` method, which acts
+Each generator can also be switched to use its own instance of ``random.Random``,
+separated from the shared one, by using the ``seed_instance()`` method, which acts
 the same way. For example:
 
 .. code:: python
@@ -422,11 +438,17 @@ Run tests:
 
     $ tox
 
-Write documentation for providers:
+Write documentation for the providers of the default locale:
 
 .. code:: bash
 
     $ python -m faker > docs.txt
+
+Write documentation for the providers of a specific locale:
+
+.. code:: bash
+
+    $ python -m faker --lang=de_DE > docs_de.txt
 
 
 Contribute
@@ -451,15 +473,15 @@ Credits
 
 .. _FZaninotto: https://github.com/fzaninotto
 .. _PHP Faker: https://github.com/fzaninotto/Faker
-.. _Perl Faker: http://search.cpan.org/~jasonk/Data-Faker-0.07/
+.. _Perl Faker: https://metacpan.org/dist/Data-Faker
 .. _Ruby Faker: https://github.com/stympy/faker
 .. _Distribute: https://pypi.org/project/distribute/
-.. _Buildout: http://www.buildout.org/
+.. _Buildout: https://www.buildout.org/
 .. _modern-package-template: https://pypi.org/project/modern-package-template/
 .. _extended docs: https://faker.readthedocs.io/en/stable/
 .. _bundled providers: https://faker.readthedocs.io/en/stable/providers.html
 .. _community providers: https://faker.readthedocs.io/en/stable/communityproviders.html
-.. _pytest fixture docs: https://faker.readthedocs.io/en/master/pytest-fixtures.html
+.. _pytest fixture docs: https://faker.readthedocs.io/en/stable/pytest-fixtures.html
 .. _LICENSE: https://github.com/joke2k/faker/blob/master/LICENSE.txt
 .. _CONTRIBUTING: https://github.com/joke2k/faker/blob/master/CONTRIBUTING.rst
 .. _Factory Boy: https://github.com/FactoryBoy/factory_boy
@@ -472,9 +494,9 @@ Credits
     :target: https://coveralls.io/r/joke2k/faker?branch=master
     :alt: Test coverage
 
-.. |build| image:: https://github.com/joke2k/faker/workflows/Python%20Tests/badge.svg?branch=master&event=push
-    :target: https://github.com/joke2k/faker/actions?query=workflow%3A%22Python+Tests%22+branch%3Amaster+event%3Apush
-    :alt: Build status of the master branch on Mac/Linux
+.. |build| image:: https://github.com/joke2k/faker/actions/workflows/ci.yml/badge.svg
+    :target: https://github.com/joke2k/faker/actions/workflows/ci.yml
+    :alt: Build status of the master branch
 
 .. |license| image:: https://img.shields.io/badge/license-MIT-blue.svg?style=flat-square
     :target: https://raw.githubusercontent.com/joke2k/faker/master/LICENSE.txt

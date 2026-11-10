@@ -1,3 +1,4 @@
+import functools
 import locale as pylocale
 import logging
 import sys
@@ -25,7 +26,7 @@ class Factory:
         cls,
         locale: Optional[str] = None,
         providers: Optional[List[str]] = None,
-        generator: Generator = None,
+        generator: Optional[Generator] = None,
         includes: Optional[List[str]] = None,
         # Should we use weightings (more realistic) or weight every element equally (faster)?
         # By default, use weightings for backwards compatibility & realism
@@ -44,17 +45,15 @@ class Factory:
 
         config["locale"] = locale
         config["use_weighting"] = use_weighting
-        providers = providers or PROVIDERS
-
-        providers += includes
+        _providers = (providers or PROVIDERS) + includes
 
         faker = generator or Generator(**config)
 
-        for prov_name in providers:
+        for prov_name in _providers:
             if prov_name == "faker.providers":
                 continue
 
-            prov_cls, lang_found = cls._get_provider_class(prov_name, locale)
+            prov_cls, lang_found, _ = cls._find_provider_class(prov_name, locale)
             provider = prov_cls(faker)
             provider.__use_weighting__ = use_weighting
             provider.__provider__ = prov_name
@@ -64,34 +63,16 @@ class Factory:
         return faker
 
     @classmethod
-    def _get_provider_class(cls, provider: str, locale: Optional[str] = "") -> Tuple[Any, Optional[str]]:
-
-        provider_class = cls._find_provider_class(provider, locale)
-
-        if provider_class:
-            return provider_class, locale
-
-        if locale and locale != DEFAULT_LOCALE:
-            # fallback to default locale
-            provider_class = cls._find_provider_class(provider, DEFAULT_LOCALE)
-            if provider_class:
-                return provider_class, DEFAULT_LOCALE
-
-        # fallback to no locale
-        provider_class = cls._find_provider_class(provider)
-        if provider_class:
-            return provider_class, None
-
-        msg = f"Unable to find provider `{provider}` with locale `{locale}`"
-        raise ValueError(msg)
-
-    @classmethod
-    def _find_provider_class(cls, provider_path: str, locale: Optional[str] = None) -> Any:
-
+    @functools.lru_cache(maxsize=None)
+    def _find_provider_class(
+        cls,
+        provider_path: str,
+        locale: Optional[str] = None,
+    ) -> Tuple[Any, Optional[str], Optional[str]]:
         provider_module = import_module(provider_path)
+        default_locale = getattr(provider_module, "default_locale", "")
 
         if getattr(provider_module, "localized", False):
-
             logger.debug(
                 "Looking for locale `%s` in provider `%s`.",
                 locale,
@@ -101,7 +82,7 @@ class Factory:
             available_locales = list_module(provider_module)
             if not locale or locale not in available_locales:
                 unavailable_locale = locale
-                locale = getattr(provider_module, "default_locale", DEFAULT_LOCALE)
+                locale = default_locale or DEFAULT_LOCALE
                 logger.debug(
                     "Specified locale `%s` is not available for "
                     "provider `%s`. Locale reset to `%s` for this "
@@ -121,16 +102,13 @@ class Factory:
             provider_module = import_module(path)
 
         else:
+            if locale:
+                logger.debug(
+                    "Provider `%s` does not feature localization. "
+                    "Specified locale `%s` is not used for this provider.",
+                    provider_module.__name__,
+                    locale,
+                )
+            locale = default_locale = None
 
-            logger.debug(
-                "Provider `%s` does not feature localization. "
-                "Specified locale `%s` is not utilized for this "
-                "provider.",
-                provider_module.__name__,
-                locale,
-            )
-
-            if locale is not None:
-                provider_module = import_module(provider_path)
-
-        return provider_module.Provider  # type: ignore
+        return provider_module.Provider, locale, default_locale  # type: ignore

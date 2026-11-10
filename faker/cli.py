@@ -1,8 +1,10 @@
 import argparse
+import itertools
 import logging
 import os
 import random
 import sys
+import textwrap
 
 from io import TextIOWrapper
 from pathlib import Path
@@ -18,6 +20,19 @@ __author__ = "joke2k"
 T = TypeVar("T")
 
 
+def _encode_for_output(value: str, output: TextIO) -> str:
+    encoding = getattr(output, "encoding", None)
+    if encoding is None:
+        return value
+
+    try:
+        value.encode(encoding)
+    except UnicodeEncodeError:
+        return value.encode(encoding, errors="backslashreplace").decode(encoding)
+
+    return value
+
+
 def print_provider(
     doc: Documentor,
     provider: BaseProvider,
@@ -31,31 +46,31 @@ def print_provider(
         excludes = []
 
     print(file=output)
-    print(f"### {doc.get_provider_name(provider)}", file=output)
+    print(_encode_for_output(f"### {doc.get_provider_name(provider)}", output), file=output)
     print(file=output)
 
+    margin = max(30, doc.max_name_len + 2)
     for signature, example in formatters.items():
         if signature in excludes:
             continue
+        signature_lines = textwrap.wrap(signature, width=margin, subsequent_indent="  ")
         try:
-            lines = str(example).expandtabs().splitlines()
+            lines = textwrap.wrap(
+                str(example).expandtabs(),
+                width=150 - margin,
+                initial_indent="# ",
+                subsequent_indent="  ",
+            )
         except UnicodeDecodeError:
             # The example is actually made of bytes.
-            # We could coerce to bytes, but that would fail anyway when we wiil
+            # We could coerce to bytes, but that would fail anyway when we will
             # try to `print` the line.
             lines = ["<bytes>"]
         except UnicodeEncodeError:
             raise Exception(f"error on {signature!r} with value {example!r}")
-        margin = max(30, doc.max_name_len + 1)
-        remains = 150 - margin
-        separator = "#"
-        for line in lines:
-            for i in range(0, (len(line) // remains) + 1):
-                print(
-                    f"\t{signature:<{margin}}{separator} {line[i * remains:(i + 1) * remains]}",
-                    file=output,
-                )
-                signature = separator = " "
+        for left, right in itertools.zip_longest(signature_lines, lines, fillvalue=""):
+            line = f"\t{left:<{margin}}  {right}"
+            print(_encode_for_output(line, output), file=output)
 
 
 def print_doc(
@@ -111,23 +126,6 @@ def print_doc(
 
         for provider, fakers in formatters:
             print_provider(doc, provider, fakers, output=output)
-
-        for language in AVAILABLE_LOCALES:
-            if language == lang:
-                continue
-            print(file=output)
-            print(f"## LANGUAGE {language}", file=output)
-            fake = Faker(locale=language)
-            fake.seed_instance(seed)
-            d = documentor.Documentor(fake)
-
-            for p, fs in d.get_formatters(
-                with_args=True,
-                with_defaults=True,
-                locale=language,
-                excludes=base_provider_formatters + unsupported,
-            ):
-                print_provider(d, p, fs, output=output)
 
 
 class Command:
@@ -213,7 +211,7 @@ examples:
             choices=AVAILABLE_LOCALES,
             default=default_locale,
             metavar="LOCALE",
-            help="specify the language for a localized " "provider (e.g. de_DE)",
+            help="specify the language for a localized provider (e.g. de_DE)",
         )
         parser.add_argument(
             "-r",
@@ -226,7 +224,7 @@ examples:
             "-s",
             "--sep",
             default="\n",
-            help="use the specified separator after each " "output",
+            help="use the specified separator after each output",
         )
 
         parser.add_argument(
@@ -241,8 +239,7 @@ examples:
         parser.add_argument(
             "-i",
             "--include",
-            default=META_PROVIDERS_MODULES,
-            nargs="*",
+            action="append",
             help="list of additional custom providers to "
             "user, given as the import path of the module "
             "containing your Provider class (not the provider "
@@ -253,7 +250,7 @@ examples:
             "fake",
             action="store",
             nargs="?",
-            help="name of the fake to generate output for " "(e.g. profile)",
+            help="name of the fake to generate output for (e.g. profile)",
         )
 
         parser.add_argument(
@@ -268,6 +265,8 @@ examples:
         )
 
         arguments = parser.parse_args(self.argv[1:])
+        if arguments.include is None:
+            arguments.include = META_PROVIDERS_MODULES
 
         if arguments.verbose:
             logging.basicConfig(level=logging.DEBUG)
@@ -278,7 +277,6 @@ examples:
         seeds = [random.random() for _ in range(arguments.repeat)]
 
         for i in range(arguments.repeat):
-
             print_doc(
                 arguments.fake,
                 arguments.fake_args,
